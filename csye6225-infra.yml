@@ -1,0 +1,161 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: Creating Virtual Private Cloud (VPC), Internet Gateway, Route Tables, and Routes for my profile. 
+
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroup:
+      - Label:
+          default: "VPC CIDR"
+        Parameters:
+          - VirtualPrivateCloudCIDRParameter
+      - Label:
+          default: "Subnet CIDR"
+        Parameters:
+          - subnetAParameter
+          - subnetBParameter
+          - subnetCParameter
+
+#Creating Virtual Private Cloud CIDR
+Parameters:
+  VirtualPrivateCloudCIDRParameter:
+    Default: "10.0.0.0/16"
+    Type: String
+    Description: IP Range for Virtual Private Cloud
+  subnetAParameter:
+    Default: "10.0.1.0/24"
+    Type: String
+    Description: Range for Subnet A
+  subnetBParameter:
+    Default: "10.0.2.0/24"
+    Type: String
+    Description: Range for Subnet B
+  subnetCParameter:
+    Default: "10.0.3.0/24"
+    Type: String
+    Description: Range for Subnet C
+
+Resources:
+  VirtualPrivateCloudVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VirtualPrivateCloudCIDRParameter
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      InstanceTenancy: "default"
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-VPC
+
+  #creating Internet Gateway
+  InternetGatewayIG:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: Internet Gateway for VirtualPrivateCloudVPC
+
+  #Attaching above created InternetGatewayIG with VirtualPrivateCloudVPC
+  InternetGatewayIGAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGatewayIG
+      VpcId: !Ref VirtualPrivateCloudVPC
+
+  # Subnet-A:
+  subnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VirtualPrivateCloudVPC
+      CidrBlock: !Ref subnetAParameter
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-SubnetA
+
+  # SubnetB:
+  subnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VirtualPrivateCloudVPC
+      CidrBlock: !Ref subnetBParameter
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-SubnetB
+
+  # SubnetC:
+  subnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VirtualPrivateCloudVPC
+      CidrBlock: !Ref subnetCParameter
+      AvailabilityZone: !Select [2, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-SubnetC
+
+  # Routing Table:
+  routingTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: Routing Table
+      VpcId: !Ref VirtualPrivateCloudVPC
+
+  # Route in routingTable
+  routeA:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGatewayIG
+      RouteTableId: !Ref routingTable
+
+  # Subnet A to the routingTable:
+  subnetAAttachment:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routingTable
+      SubnetId: !Ref subnetA
+
+   # Subnet B to the routingTable:
+  subnetBAttachment:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routingTable
+      SubnetId: !Ref subnetB
+
+  # Subnet C to the routingTable:
+  subnetCAttachment:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routingTable
+      SubnetId: !Ref subnetC
+
+# Generating output on Cloud Formation
+Outputs:
+  VpcId:
+    Description: Virtual Private Cloud
+    Value: !Ref VirtualPrivateCloudVPC
+    Export:
+      Name: !Sub ${AWS::StackName}-VirtualPrivateCloud
+  subnetAId:
+    Description: Subnet A 
+    Value: !Ref subnetA
+    Export:
+      Name: !Sub ${AWS::StackName}-subnetA
+  subnetBId:
+    Description: Subnet B
+    Value: !Ref subnetB
+    Export:
+      Name: !Sub ${AWS::StackName}-subnetB
+  subnetCId:
+    Description: Subnet C
+    Value: !Ref subnetC
+    Export:
+      Name: !Sub ${AWS::StackName}-subnetC
