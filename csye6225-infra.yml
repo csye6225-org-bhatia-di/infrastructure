@@ -16,6 +16,10 @@ Metadata:
           - subnetAParameter
           - subnetBParameter
           - subnetCParameter
+      - Label:
+          default: "My Image Value"
+        Parameters:
+          - MyImageParameter    
 
 #Creating Virtual Private Cloud CIDR
 Parameters:
@@ -35,6 +39,10 @@ Parameters:
     Default: "10.0.3.0/24"
     Type: String
     Description: Range for Subnet C
+  MyImageParameter:
+    Default: ""
+    Type: String
+    Description: My Image Parameter  
 
 Resources:
   VirtualPrivateCloudVPC:
@@ -136,6 +144,61 @@ Resources:
     Properties:
       RouteTableId: !Ref routingTable
       SubnetId: !Ref subnetC
+
+
+  #EC2 Security Group
+  applicationSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      VpcId: !Ref VirtualPrivateCloudVPC
+      GroupDescription: ec2 Security group with ports
+      GroupName: applicationSecurityGroup
+      SecurityGroupIngress: 
+          
+            - IpProtocol : "tcp"
+              FromPort : "22"
+              ToPort : "22"
+              CidrIp : "0.0.0.0/0"
+         
+            - IpProtocol : "tcp"
+              FromPort : "443"
+              ToPort : "443"
+              CidrIp : "0.0.0.0/0"
+
+            - IpProtocol : "tcp"
+              FromPort : "3000"
+              ToPort : "3000"
+              CidrIp : "0.0.0.0/0"
+
+            - IpProtocol : "tcp"
+              FromPort : "80"
+              ToPort : "80"
+              CidrIp : "0.0.0.0/0"              
+      Tags: 
+        - Key: Name
+          Value: EC2 Security Group
+      
+
+ 
+
+  #EC2 Instance
+  ec2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref MyImageParameter
+      DisableApiTermination: false
+      InstanceType: t2.micro
+      BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            VolumeSize: 20
+            VolumeType: gp2
+      NetworkInterfaces: 
+        - SubnetId: !Ref subnetA
+          AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          GroupSet: [!Ref applicationSecurityGroup]
+ 
 
 # Generating output on Cloud Formation
 Outputs:
