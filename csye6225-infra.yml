@@ -17,8 +17,9 @@ Metadata:
           - subnetBParameter
           - subnetCParameter
       - Label:
+          default: "My Image Value"
         Parameters:
-          - MyImageValue    
+          - MyImageParameter    
 
 #Creating Virtual Private Cloud CIDR
 Parameters:
@@ -38,6 +39,10 @@ Parameters:
     Default: "10.0.3.0/24"
     Type: String
     Description: Range for Subnet C
+  MyImageParameter:
+    Default: ""
+    Type: String
+    Description: My Image Parameter  
 
 Resources:
   VirtualPrivateCloudVPC:
@@ -180,17 +185,16 @@ Resources:
   ec2Instance:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: !Ref MyImageValue
+      ImageId: !Ref MyImageParameter
       DisableApiTermination: false
       InstanceType: t2.micro
       BlockDeviceMappings:
-       - Device: "/dev/sda1"
-      Ebs:
-        VolumeSize: 20
-        VolumeType: gp2
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            VolumeSize: 20
+            VolumeType: gp2
       NetworkInterfaces: 
-        -
-          SubnetId: !Ref subnetA
+        - SubnetId: !Ref subnetA
           AssociatePublicIpAddress: true
           DeviceIndex: 0
           GroupSet: [!Ref applicationSecurityGroup]
