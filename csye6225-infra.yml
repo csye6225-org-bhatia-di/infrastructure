@@ -43,6 +43,87 @@ Parameters:
     Default: ""
     Type: String
     Description: My Image Parameter  
+  PrivateSubnet1CIDR:
+    Default: "10.0.4.0/24"
+    Type: String
+    Description: Please Enter the IP Range for Private Subnet-1
+  PrivateSubnet2CIDR:
+    Default: "10.0.5.0/24"
+    Type: String
+    Description: Please Enter the IP Range for Private Subnet-2
+  PrivateSubnet3CIDR:
+    Default: "10.0.6.0/24"
+    Type: String
+    Description: Please Enter the IP Range for Private Subnet-3
+  DatabaseInstanceIdentifier:
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: Must begin with a letter and contain only alphanumeric characters
+    Default: csye6225
+    Description: Instance identifier name
+    MaxLength: 60
+    MinLength: 1
+    Type: String
+  DatabaseName:
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: Must begin with a letter and contain only alphanumeric characters
+    Default: csye6225
+    Description: Postgres database name
+    MaxLength: 64
+    MinLength: 1
+    Type: String
+  dbuserdetails:
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    Default: csye6225
+    MaxLength: 16
+    MinLength: 1
+    NoEcho: true
+    Type: String
+  dbpassword:
+    AllowedPattern: "[a-zA-Z0-9]*"
+    Default: password
+    MaxLength: 41
+    MinLength: 8
+    NoEcho: true
+    Type: String
+  dbbackup:
+    Default: 0
+    MaxValue: 35
+    MinValue: 0
+    Type: Number
+  dbstorage:
+    Default: 20
+    MaxValue: 65536
+    MinValue: 5
+    Type: Number
+  dbinstancedetails:
+    AllowedValues:
+      - db.t2.micro
+    Default: db.t2.micro
+    Type: String
+  dbmultiaz:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+  bucketnameforuse:
+    Type: String
+    Description: Name of the bucket
+    Default: dev.bhatiadi.me
+  secretkey:
+    Default: ""
+    Type: String
+    Description: AWS Secret key
+  accesskey:
+    Default: ""
+    Type: String
+    Description: AWS Access key
+  regionforbucket:
+    Default: "us-east-1"
+    Type: String
+    Description: Bucket region Access key
+
+
 
 Resources:
   VirtualPrivateCloudVPC:
@@ -115,6 +196,13 @@ Resources:
         - Key: Name
           Value: Routing Table
       VpcId: !Ref VirtualPrivateCloudVPC
+  RTPrivate:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: PRT
+      VpcId: !Ref VirtualPrivateCloudVPC
 
   # Route in routingTable
   routeA:
@@ -145,6 +233,72 @@ Resources:
       RouteTableId: !Ref routingTable
       SubnetId: !Ref subnetC
 
+  privateSub1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VirtualPrivateCloudVPC
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: PrivateSubnet1
+
+  #creating Private Subnet-2:
+  privateSub2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VirtualPrivateCloudVPC
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: PrivateSubnet2
+
+  #creating Private Subnet-3:
+  privateSub3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VirtualPrivateCloudVPC
+      CidrBlock: !Ref PrivateSubnet3CIDR
+      AvailabilityZone: !Select [2, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: PrivateSubnet3
+
+  #Attaching the private subnets-1 to the private Route Table:
+  privatesub1Associate:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RTPrivate
+      SubnetId: !Ref privateSub1
+
+  #Attaching the private subnets-2 to the private Route Table:
+  privatesub2Associate:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RTPrivate
+      SubnetId: !Ref privateSub2
+
+  #Attaching the private subnets-3 to the private Route Table:
+  privatesub3Associate:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RTPrivate
+      SubnetId: !Ref privateSub3
+
+  #custom parameter group for RDS
+  rdsprameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Family: postgres12
+      Description: Custom Database Parameter Group
+      Parameters:
+        shared_preload_libraries: "pg_stat_statements"
+
+
 
   #EC2 Security Group
   applicationSecurityGroup:
@@ -152,40 +306,178 @@ Resources:
     Properties: 
       VpcId: !Ref VirtualPrivateCloudVPC
       GroupDescription: ec2 Security group with ports
-      GroupName: applicationSecurityGroup
-      SecurityGroupIngress: 
-          
+      GroupName: application
+      SecurityGroupIngress:           
             - IpProtocol : "tcp"
               FromPort : "22"
               ToPort : "22"
-              CidrIp : "0.0.0.0/0"
-         
+              CidrIp : "0.0.0.0/0"         
             - IpProtocol : "tcp"
               FromPort : "443"
               ToPort : "443"
               CidrIp : "0.0.0.0/0"
-
             - IpProtocol : "tcp"
               FromPort : "3000"
               ToPort : "3000"
               CidrIp : "0.0.0.0/0"
-
             - IpProtocol : "tcp"
               FromPort : "80"
               ToPort : "80"
               CidrIp : "0.0.0.0/0"              
       Tags: 
         - Key: Name
-          Value: EC2 Security Group
-      
+          Value: EC2 Security Group 
 
- 
+  dbsecuritygrp:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VirtualPrivateCloudVPC
+      GroupDescription: RDS Security group with ports
+      GroupName: database
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref applicationSecurityGroup
 
-  #EC2 Instance
+  dbsubgrp:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for RDS database
+      SubnetIds:
+        - !Ref privateSub1
+        - !Ref privateSub2
+      Tags:
+        - Key: Name
+          Value: database subnets
+
+  dbinstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: !Ref dbstorage
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      BackupRetentionPeriod: !Ref dbbackup
+      DBInstanceClass: !Ref dbinstancedetails
+      DBInstanceIdentifier: !Ref DatabaseInstanceIdentifier
+      DBName: !Ref DatabaseName
+      DBSubnetGroupName: !Ref dbsubgrp
+      Engine: postgres
+      EngineVersion: 12.9
+      MasterUsername: !Ref dbuserdetails
+      MasterUserPassword: !Ref dbpassword
+      MultiAZ: !Ref dbmultiaz
+      PubliclyAccessible: false
+      DBParameterGroupName: !Ref rdsprameterGroup
+      VPCSecurityGroups:
+        - !Ref dbsecuritygrp
+
+  #creating s3 bucket:
+  S3Bucket:
+    Type: "AWS::S3::Bucket"
+    Description: Creating Amazon S3 bucket from CloudFormation
+    DeletionPolicy: Delete
+    Properties:
+      BucketName:
+        !Join [
+          ".",
+          [
+            !Select [0, !Split [-, !Select [2, !Split [/, !Ref AWS::StackId]]]],
+            !Ref bucketnameforuse,
+          ],
+        ]
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: Rule for log prefix
+            Prefix: logs
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: STANDARD_IA
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - GET
+              - PUT
+              - POST
+              - DELETE
+            AllowedOrigins:
+              - "*"
+            MaxAge: "3600"
+
+  #creating s3 policy:
+  s3policy:
+    Type: "AWS::IAM::ManagedPolicy"
+    DependsOn: S3Bucket
+    Properties:
+      ManagedPolicyName: WebAppS3
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AllowGetPutDeleteActionsOnS3Bucket
+            Effect: Allow
+            Action:
+              - "s3:PutObject"
+              - "s3:GetObject"
+              - "s3:DeleteObject"
+              - "s3:PostObject"
+            Resource:
+                'Fn::Join':
+                  - ''
+                  - - 'arn:aws:s3:::'
+                    - Ref: S3Bucket
+                    - /*
+                'Fn::Join':
+                  - ''
+                  - - 'arn:aws:s3:::'
+                    - Ref: S3Bucket
+
+  #creating IAM roles:
+  s3role:
+    Type: AWS::IAM::Role
+    DependsOn: s3policy
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Path: /
+      RoleName: EC2-CSYE6225
+      ManagedPolicyArns:
+        - !Ref s3policy
+
+  #creating a instance profile:
+  ec2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: ec2-instance-profile
+      Path: /
+      Roles:
+        - !Ref s3role
+
+
+#EC2 Instance
   ec2Instance:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !Ref MyImageParameter
+      IamInstanceProfile: !Ref ec2InstanceProfile
       DisableApiTermination: false
       InstanceType: t2.micro
       BlockDeviceMappings:
@@ -198,6 +490,22 @@ Resources:
           AssociatePublicIpAddress: true
           DeviceIndex: 0
           GroupSet: [!Ref applicationSecurityGroup]
+      UserData:
+        Fn::Base64: !Sub |
+          !/bin/bash
+          sudo touch /tmp/webservice/.env
+          sudo chmod -R 777 /tmp/webservice/.env
+          sudo chown ec2-user:ec2-user /tmp/webservice/.env
+          sudo echo 'DB_HOSTNAME=${dbinstance.Endpoint.Address}' >> /tmp/webservice/.env
+          sudo echo 'DB_USER=${dbuserdetails}' >> /tmp/webservice/.env
+          sudo echo 'PASSWORD=${dbpassword}' >> /tmp/webservice/.env
+          sudo echo 'AWS_BUCKET_NAME=${bucketnameforuse}' >> /tmp/webservice/.env
+          sudo echo 'DB_NAME=${DatabaseName}' >> /tmp/webservice/.env
+          sudo echo 'AWS_ACCESS_KEY_ID=${accesskey}' >> /tmp/webservice/.env
+          sudo echo 'AWS_SECRET_ACCESS_KEY=${secretkey}' >> /tmp/webservice/.env
+          sudo echo 'AWS_BUCKET_REGION=${regionforbucket}' >> /tmp/webservice/.env
+          sleep 50
+          sudo npm run db-migrate    
  
 
 # Generating output on Cloud Formation
