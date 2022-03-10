@@ -233,10 +233,10 @@ Resources:
       RouteTableId: !Ref routingTable
       SubnetId: !Ref subnetC
 
-privateSub1:
+  privateSub1:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref myVPC
+      VpcId: !Ref VirtualPrivateCloudVPC
       CidrBlock: !Ref PrivateSubnet1CIDR
       AvailabilityZone: !Select [0, !GetAZs ""]
       MapPublicIpOnLaunch: false
@@ -245,10 +245,10 @@ privateSub1:
           Value: PrivateSubnet1
 
   #creating Private Subnet-2:
-privateSub2:
+  privateSub2:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref myVPC
+      VpcId: !Ref VirtualPrivateCloudVPC
       CidrBlock: !Ref PrivateSubnet2CIDR
       AvailabilityZone: !Select [1, !GetAZs ""]
       MapPublicIpOnLaunch: false
@@ -257,10 +257,10 @@ privateSub2:
           Value: PrivateSubnet2
 
   #creating Private Subnet-3:
-privateSub3:
+  privateSub3:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref myVPC
+      VpcId: !Ref VirtualPrivateCloudVPC
       CidrBlock: !Ref PrivateSubnet3CIDR
       AvailabilityZone: !Select [2, !GetAZs ""]
       MapPublicIpOnLaunch: false
@@ -269,28 +269,28 @@ privateSub3:
           Value: PrivateSubnet3
 
   #Attaching the private subnets-1 to the private Route Table:
-privatesub1Associate:
+  privatesub1Associate:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref RTPrivate
       SubnetId: !Ref privateSub1
 
   #Attaching the private subnets-2 to the private Route Table:
-privatesub2Associate:
+  privatesub2Associate:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref RTPrivate
       SubnetId: !Ref privateSub2
 
   #Attaching the private subnets-3 to the private Route Table:
-privatesub3Associate:
+  privatesub3Associate:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref RTPrivate
       SubnetId: !Ref privateSub3
 
   #custom parameter group for RDS
-rdsprameterGroup:
+  rdsprameterGroup:
     Type: AWS::RDS::DBParameterGroup
     Properties:
       Family: postgres12
@@ -301,29 +301,25 @@ rdsprameterGroup:
 
 
   #EC2 Security Group
-applicationSecurityGroup:
-  Type: AWS::EC2::SecurityGroup
-  Properties: 
+  applicationSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
       VpcId: !Ref VirtualPrivateCloudVPC
       GroupDescription: ec2 Security group with ports
-      GroupName: applicationSecurityGroup
-      SecurityGroupIngress: 
-          
+      GroupName: application
+      SecurityGroupIngress:           
             - IpProtocol : "tcp"
               FromPort : "22"
               ToPort : "22"
-              CidrIp : "0.0.0.0/0"
-         
+              CidrIp : "0.0.0.0/0"         
             - IpProtocol : "tcp"
               FromPort : "443"
               ToPort : "443"
               CidrIp : "0.0.0.0/0"
-
             - IpProtocol : "tcp"
               FromPort : "3000"
               ToPort : "3000"
               CidrIp : "0.0.0.0/0"
-
             - IpProtocol : "tcp"
               FromPort : "80"
               ToPort : "80"
@@ -332,19 +328,19 @@ applicationSecurityGroup:
         - Key: Name
           Value: EC2 Security Group 
 
-dbsecuritygrp:
+  dbsecuritygrp:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      VpcId: !Ref myVPC
+      VpcId: !Ref VirtualPrivateCloudVPC
       GroupDescription: RDS Security group with ports
       GroupName: database
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 5432
           ToPort: 5432
-          SourceSecurityGroupId: !Ref ApplicationSecurityGroup
+          SourceSecurityGroupId: !Ref applicationSecurityGroup
 
-dbsubgrp:
+  dbsubgrp:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
       DBSubnetGroupDescription: Subnet group for RDS database
@@ -355,7 +351,7 @@ dbsubgrp:
         - Key: Name
           Value: database subnets
 
-dbinstance:
+  dbinstance:
     Type: AWS::RDS::DBInstance
     Properties:
       AllocatedStorage: !Ref dbstorage
@@ -376,7 +372,7 @@ dbinstance:
         - !Ref dbsecuritygrp
 
   #creating s3 bucket:
-S3Bucket:
+  S3Bucket:
     Type: "AWS::S3::Bucket"
     Description: Creating Amazon S3 bucket from CloudFormation
     DeletionPolicy: Delete
@@ -421,7 +417,7 @@ S3Bucket:
             MaxAge: "3600"
 
   #creating s3 policy:
-s3policy:
+  s3policy:
     Type: "AWS::IAM::ManagedPolicy"
     DependsOn: S3Bucket
     Properties:
@@ -448,7 +444,7 @@ s3policy:
                     - Ref: S3Bucket
 
   #creating IAM roles:
-s3role:
+  s3role:
     Type: AWS::IAM::Role
     DependsOn: s3policy
     Properties:
@@ -467,7 +463,7 @@ s3role:
         - !Ref s3policy
 
   #creating a instance profile:
-ec2InstanceProfile:
+  ec2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
       InstanceProfileName: ec2-instance-profile
@@ -477,7 +473,7 @@ ec2InstanceProfile:
 
 
 #EC2 Instance
-ec2Instance:
+  ec2Instance:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !Ref MyImageParameter
@@ -494,23 +490,22 @@ ec2Instance:
           AssociatePublicIpAddress: true
           DeviceIndex: 0
           GroupSet: [!Ref applicationSecurityGroup]
-    UserData:
+      UserData:
         Fn::Base64: !Sub |
-          #! /bin/bash
+          !/bin/bash
           sudo touch /tmp/webservice/.env
           sudo chmod -R 777 /tmp/webservice/.env
           sudo chown ec2-user:ec2-user /tmp/webservice/.env
           sudo echo 'DB_HOSTNAME=${dbinstance.Endpoint.Address}' >> /tmp/webservice/.env
           sudo echo 'DB_USER=${dbuserdetails}' >> /tmp/webservice/.env
           sudo echo 'PASSWORD=${dbpassword}' >> /tmp/webservice/.env
-          sudo echo 'AWS_BUCKET_NAME=${S3Bucket}' >> /tmp/webservice/.env
+          sudo echo 'AWS_BUCKET_NAME=${bucketnameforuse}' >> /tmp/webservice/.env
           sudo echo 'DB_NAME=${DatabaseName}' >> /tmp/webservice/.env
           sudo echo 'AWS_ACCESS_KEY_ID=${accesskey}' >> /tmp/webservice/.env
           sudo echo 'AWS_SECRET_ACCESS_KEY=${secretkey}' >> /tmp/webservice/.env
           sudo echo 'AWS_BUCKET_REGION=${regionforbucket}' >> /tmp/webservice/.env
-          sleep 40
-          cd /tmp/webservice
-          sudo npm run db-migrate      
+          sleep 50
+          sudo npm run db-migrate    
  
 
 # Generating output on Cloud Formation
