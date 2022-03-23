@@ -505,7 +505,8 @@ Resources:
           sudo echo 'AWS_SECRET_ACCESS_KEY=${secretkey}' >> /tmp/webservice/.env
           sudo echo 'AWS_BUCKET_REGION=${regionforbucket}' >> /tmp/webservice/.env
           sudo echo 'NODE_ENV=demo' >> /tmp/webservice/.env
-          sleep 50
+          sleep 60
+          cd /tmp/webservice
           sudo npm run db-migrate    
  
 
