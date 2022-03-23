@@ -492,18 +492,19 @@ Resources:
           GroupSet: [!Ref applicationSecurityGroup]
       UserData:
         Fn::Base64: !Sub |
-          !/bin/bash
+          #!/bin/bash
           sudo touch /tmp/webservice/.env
           sudo chmod -R 777 /tmp/webservice/.env
           sudo chown ec2-user:ec2-user /tmp/webservice/.env
           sudo echo 'DB_HOSTNAME=${dbinstance.Endpoint.Address}' >> /tmp/webservice/.env
           sudo echo 'DB_USER=${dbuserdetails}' >> /tmp/webservice/.env
           sudo echo 'PASSWORD=${dbpassword}' >> /tmp/webservice/.env
-          sudo echo 'AWS_BUCKET_NAME=${bucketnameforuse}' >> /tmp/webservice/.env
+          sudo echo 'AWS_BUCKET_NAME=${S3Bucket}' >> /tmp/webservice/.env
           sudo echo 'DB_NAME=${DatabaseName}' >> /tmp/webservice/.env
           sudo echo 'AWS_ACCESS_KEY_ID=${accesskey}' >> /tmp/webservice/.env
           sudo echo 'AWS_SECRET_ACCESS_KEY=${secretkey}' >> /tmp/webservice/.env
           sudo echo 'AWS_BUCKET_REGION=${regionforbucket}' >> /tmp/webservice/.env
+          sudo echo 'NODE_ENV=demo' >> /tmp/webservice/.env
           sleep 50
           sudo npm run db-migrate    
  
