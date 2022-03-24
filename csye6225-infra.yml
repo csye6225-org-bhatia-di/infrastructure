@@ -109,15 +109,7 @@ Parameters:
   bucketnameforuse:
     Type: String
     Description: Name of the bucket
-    Default: dev.bhatiadi.me
-  secretkey:
-    Default: ""
-    Type: String
-    Description: AWS Secret key
-  accesskey:
-    Default: ""
-    Type: String
-    Description: AWS Access key
+    Default: dev.bhatiadi.me  
   regionforbucket:
     Default: "us-east-1"
     Type: String
@@ -501,8 +493,6 @@ Resources:
           sudo echo 'PASSWORD=${dbpassword}' >> /tmp/webservice/.env
           sudo echo 'AWS_BUCKET_NAME=${S3Bucket}' >> /tmp/webservice/.env
           sudo echo 'DB_NAME=${DatabaseName}' >> /tmp/webservice/.env
-          sudo echo 'AWS_ACCESS_KEY_ID=${accesskey}' >> /tmp/webservice/.env
-          sudo echo 'AWS_SECRET_ACCESS_KEY=${secretkey}' >> /tmp/webservice/.env
           sudo echo 'AWS_BUCKET_REGION=${regionforbucket}' >> /tmp/webservice/.env
           sudo echo 'NODE_ENV=demo' >> /tmp/webservice/.env
           sleep 60
