@@ -123,9 +123,13 @@ Parameters:
     Type: String
     Description: Bucket region Access key
   hostedZoneID:
-    Description: zone id domain
+    Description: dev / demo zone id domain
     Type: String
-    Default: "Z00710032ICQZH2YOYB4Y"
+    Default: "Z01096722S5OIW7NXF70F"
+  DomainNameParameter:
+    Description: domain Name for S3 Bucket Naming
+    Type: String
+    Default: "dev.bhatiadi.me"  
   KeyPairParameter: 
     Description: Amazon EC2 Key Pair
     Type: "AWS::EC2::KeyPair::KeyName"
@@ -323,8 +327,7 @@ Resources:
               CidrIp : "0.0.0.0/0"         
             - IpProtocol : "tcp"
               FromPort : "3000"
-              ToPort : "3000"
-              CidrIp : "0.0.0.0/0"
+              ToPort : "3000"              
               SourceSecurityGroupId: !Ref loadbalSecGrp
       Tags: 
         - Key: Name
@@ -517,7 +520,7 @@ Resources:
       HealthCheckTimeoutSeconds: 60
       HealthyThresholdCount: 2
       IpAddressType: ipv4      
-      Name: !Sub '${AWS::StackName}-load-balancer-target'
+      Name: !Sub '${AWS::StackName}-LBTargetGrp'
       TargetType: instance
       Port: 3000
       Protocol: HTTP
@@ -594,7 +597,7 @@ Resources:
       Cooldown: '60'
       HealthCheckType: EC2
       DesiredCapacity: '3'
-      LaunchConfigurationName: !Ref LaunchConfiguration
+      LaunchConfigurationName: !Ref InstanceLaunchConfig
       MinSize: '3'
       MaxSize: '5'
       MetricsCollection:
@@ -677,10 +680,10 @@ Resources:
       ComparisonOperator: LessThanThreshold
 
 #creating an alias for the loadbalancer to point to our domain name:
-  DnsRecordSet:
+  RecordDomainNameServer:
     Type: 'AWS::Route53::RecordSet'
     Properties:
-      Name: !Ref DomainName
+      Name: !Ref DomainNameParameter
       Type: A
       HostedZoneId: !Ref hostedZoneID
       AliasTarget:
