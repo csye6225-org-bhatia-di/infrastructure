@@ -11,7 +11,7 @@ Steps:
 6. export AWS_PROFILE=demo
 aws ec2 import-key-pair --key-name "DevInstanceKey" --public-key-material fileb://DevInstanceKey.pem
 
-aws cloudformation create-stack --stack-name webserviceStack7 --template-body file://csye6225-infra.yml --parameter ParameterKey=MyImageParameter,ParameterValue="ami-0ca5a72d78678c959" ParameterKey=accesskey,ParameterValue="" ParameterKey=secretkey,ParameterValue="" ParameterKey=KeyPairParameter,ParameterValue="" --capabilities CAPABILITY_NAMED_IAM
+aws cloudformation create-stack --stack-name webserviceStack7 --template-body file://csye6225-infra.yml --parameter ParameterKey=MyImageParameter,ParameterValue="ami-0ca5a72d78678c959" ParameterKey=accesskey,ParameterValue="" ParameterKey=secretkey,ParameterValue="" ParameterKey=KeyPairParameter,ParameterValue="" ParameterKey=DomainNameParameter,ParameterValue="" --capabilities CAPABILITY_NAMED_IAM
 
 Deleting stack
 aws s3 rm s3://52e7e710.dev.bhatiadi.me --recursive

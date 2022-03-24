@@ -125,11 +125,9 @@ Parameters:
   hostedZoneID:
     Description: dev / demo zone id domain
     Type: String
-    Default: "Z01096722S5OIW7NXF70F"
   DomainNameParameter:
     Description: domain Name for S3 Bucket Naming
     Type: String
-    Default: "dev.bhatiadi.me"  
   KeyPairParameter: 
     Description: Amazon EC2 Key Pair
     Type: "AWS::EC2::KeyPair::KeyName"
@@ -596,9 +594,9 @@ Resources:
         - us-east-1c      
       Cooldown: '60'
       HealthCheckType: EC2
-      DesiredCapacity: '3'
+      DesiredCapacity: '1'
       LaunchConfigurationName: !Ref InstanceLaunchConfig
-      MinSize: '3'
+      MinSize: '1'
       MaxSize: '5'
       MetricsCollection:
         - Granularity: 1Minute
