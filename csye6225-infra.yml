@@ -55,6 +55,14 @@ Parameters:
     Default: "10.0.6.0/24"
     Type: String
     Description: Please Enter the IP Range for Private Subnet-3
+  secretkey:
+    Default: ""
+    Type: String
+    Description: AWS Secret key
+  accesskey:
+    Default: ""
+    Type: String
+    Description: AWS Access key    
   DatabaseInstanceIdentifier:
     AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
     ConstraintDescription: Must begin with a letter and contain only alphanumeric characters
@@ -114,6 +122,14 @@ Parameters:
     Default: "us-east-1"
     Type: String
     Description: Bucket region Access key
+  hostedZoneID:
+    Description: zone id domain
+    Type: String
+    Default: "Z00710032ICQZH2YOYB4Y"
+  KeyPairParameter: 
+    Description: Amazon EC2 Key Pair
+    Type: "AWS::EC2::KeyPair::KeyName"
+    
 
 
 
@@ -144,7 +160,8 @@ Resources:
       InternetGatewayId: !Ref InternetGatewayIG
       VpcId: !Ref VirtualPrivateCloudVPC
 
-  # Subnet-A:
+  #PUBLIC SUBNETS
+  # Public Subnet-A:
   subnetA:
     Type: AWS::EC2::Subnet
     Properties:
@@ -298,24 +315,17 @@ Resources:
     Properties: 
       VpcId: !Ref VirtualPrivateCloudVPC
       GroupDescription: ec2 Security group with ports
-      GroupName: application
+      GroupName: applicationSecurityGroup
       SecurityGroupIngress:           
             - IpProtocol : "tcp"
               FromPort : "22"
               ToPort : "22"
               CidrIp : "0.0.0.0/0"         
             - IpProtocol : "tcp"
-              FromPort : "443"
-              ToPort : "443"
-              CidrIp : "0.0.0.0/0"
-            - IpProtocol : "tcp"
               FromPort : "3000"
               ToPort : "3000"
               CidrIp : "0.0.0.0/0"
-            - IpProtocol : "tcp"
-              FromPort : "80"
-              ToPort : "80"
-              CidrIp : "0.0.0.0/0"              
+              SourceSecurityGroupId: !Ref loadbalSecGrp
       Tags: 
         - Key: Name
           Value: EC2 Security Group 
@@ -455,7 +465,7 @@ Resources:
         - !Ref s3policy
 
   #creating a instance profile:
-  ec2InstanceProfile:
+  instanceEC2Profile:
     Type: AWS::IAM::InstanceProfile
     Properties:
       InstanceProfileName: ec2-instance-profile
@@ -464,24 +474,94 @@ Resources:
         - !Ref s3role
 
 
-#EC2 Instance
-  ec2Instance:
-    Type: AWS::EC2::Instance
+  loadbalSecGrp:
+    Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      ImageId: !Ref MyImageParameter
-      IamInstanceProfile: !Ref ec2InstanceProfile
-      DisableApiTermination: false
+      GroupName: load balancer security group
+      GroupDescription: The security groupp created for web server to hit the API
+      VpcId: !Ref VirtualPrivateCloudVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIp: 0.0.0.0/0 
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
+        
+  loadBalancer:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      Name: !Sub ${AWS::StackName}-load-balancer
+      Type: application
+      IpAddressType: ipv4
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref loadbalSecGrp
+      Subnets:
+        - !Ref subnetA
+        - !Ref subnetB
+        - !Ref subnetC
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-load-balancer
+
+  loadBalTG:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      HealthCheckIntervalSeconds: 90
+      HealthCheckPath: '/healthz'
+      HealthCheckPort: '3000'
+      HealthCheckProtocol: 'HTTP'
+      HealthCheckTimeoutSeconds: 60
+      HealthyThresholdCount: 2
+      IpAddressType: ipv4      
+      Name: !Sub '${AWS::StackName}-load-balancer-target'
+      TargetType: instance
+      Port: 3000
+      Protocol: HTTP
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-lb-TargetGroup'
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '20'          
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref VirtualPrivateCloudVPC
+
+# Routing 80 to the right port      
+  loadBalancerListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref loadBalTG
+      LoadBalancerArn: !Ref loadBalancer
+      Port: 80
+      Protocol: HTTP  
+
+
+# instance config for every launch
+  InstanceLaunchConfig:
+    Type: 'AWS::AutoScaling::LaunchConfiguration'
+    Properties:
+      LaunchConfigurationName: asg_launch_config
+      PlacementTenancy: default
       InstanceType: t2.micro
+      AssociatePublicIpAddress: true
+      IamInstanceProfile: !Ref instanceEC2Profile
+      ImageId: !Ref MyImageParameter
+      SecurityGroups:
+        - !Ref applicationSecurityGroup
+      KeyName: !Ref KeyPairParameter
       BlockDeviceMappings:
-        - DeviceName: "/dev/xvda"
+        - DeviceName: /dev/xvda
           Ebs:
-            VolumeSize: 20
             VolumeType: gp2
-      NetworkInterfaces: 
-        - SubnetId: !Ref subnetA
-          AssociatePublicIpAddress: true
-          DeviceIndex: 0
-          GroupSet: [!Ref applicationSecurityGroup]
+            DeleteOnTermination: true
+            VolumeSize: '20'
+      EbsOptimized: false
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
@@ -493,11 +573,162 @@ Resources:
           sudo echo 'PASSWORD=${dbpassword}' >> /tmp/webservice/.env
           sudo echo 'AWS_BUCKET_NAME=${S3Bucket}' >> /tmp/webservice/.env
           sudo echo 'DB_NAME=${DatabaseName}' >> /tmp/webservice/.env
+          sudo echo 'AWS_ACCESS_KEY_ID=${accesskey}' >> /tmp/webservice/.env
+          sudo echo 'AWS_SECRET_ACCESS_KEY=${secretkey}' >> /tmp/webservice/.env
           sudo echo 'AWS_BUCKET_REGION=${regionforbucket}' >> /tmp/webservice/.env
           sudo echo 'NODE_ENV=demo' >> /tmp/webservice/.env
           sleep 60
           cd /tmp/webservice
-          sudo npm run db-migrate    
+          sudo npm run db-migrate  
+
+          
+# Auto scle grp
+  autoScaleGrp:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
+    Properties:
+      AutoScalingGroupName: !Sub '${AWS::StackName}-asg'
+      AvailabilityZones:
+        - us-east-1a
+        - us-east-1b
+        - us-east-1c      
+      Cooldown: '60'
+      HealthCheckType: EC2
+      DesiredCapacity: '3'
+      LaunchConfigurationName: !Ref LaunchConfiguration
+      MinSize: '3'
+      MaxSize: '5'
+      MetricsCollection:
+        - Granularity: 1Minute
+          Metrics:
+            - GroupInServiceInstances
+            - GroupPendingInstances
+            - GroupStandbyInstances
+            - GroupTerminatingInstances
+            - GroupTotalInstances
+      TargetGroupARNs:
+        - !Ref loadBalTG
+      TerminationPolicies:
+        - OldestInstance
+        - Default
+      VPCZoneIdentifier:
+        - !Ref subnetA
+        - !Ref subnetB
+        - !Ref subnetC
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-asg'
+          PropagateAtLaunch: true
+        - Key: Application
+          Value: WebApp
+          PropagateAtLaunch: true
+
+#Autoscaling scale up policy:          
+  ScaleUpPolicyApp:
+    Type: 'AWS::AutoScaling::ScalingPolicy'
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref autoScaleGrp
+      Cooldown: '60'
+      ScalingAdjustment: '1'
+
+#Autoscaling scale down policy:      
+  ScaleDownPolicyApp:
+    Type: 'AWS::AutoScaling::ScalingPolicy'
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref autoScaleGrp
+      Cooldown: '60'
+      ScalingAdjustment: '-1'
+
+#CPU utilization for 
+  ScaleUpCPUUtil:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmDescription: Scale-up 
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: '60'
+      EvaluationPeriods: '2'
+      Threshold: '5'
+      AlarmActions:
+        - !Ref ScaleUpPolicyApp
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref autoScaleGrp
+      ComparisonOperator: GreaterThanThreshold
+
+#CPU utilization for above policy to trigger for Scaling down:
+  ScaleDownCPUUtil:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmDescription: Scale-down if CPU < 3% for 2 minutes
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: '60'
+      EvaluationPeriods: '2'
+      Threshold: '3'
+      AlarmActions:
+        - !Ref ScaleDownPolicyApp
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref autoScaleGrp
+      ComparisonOperator: LessThanThreshold
+
+#creating an alias for the loadbalancer to point to our domain name:
+  DnsRecordSet:
+    Type: 'AWS::Route53::RecordSet'
+    Properties:
+      Name: !Ref DomainName
+      Type: A
+      HostedZoneId: !Ref hostedZoneID
+      AliasTarget:
+        DNSName: !GetAtt 
+          - loadBalancer
+          - DNSName
+        EvaluateTargetHealth: false
+        HostedZoneId: !GetAtt 
+          - loadBalancer
+          - CanonicalHostedZoneID
+ 
+          
+#EC2 Instance
+  # ec2Instance:
+  #   Type: AWS::EC2::Instance
+  #   Properties:
+  #     ImageId: !Ref MyImageParameter
+  #     IamInstanceProfile: !Ref instanceEC2Profile
+  #     DisableApiTermination: false
+  #     InstanceType: t2.micro
+  #     BlockDeviceMappings:
+  #       - DeviceName: "/dev/xvda"
+  #         Ebs:
+  #           VolumeSize: 20
+  #           VolumeType: gp2
+  #     NetworkInterfaces: 
+  #       - SubnetId: !Ref subnetA
+  #         AssociatePublicIpAddress: true
+  #         DeviceIndex: 0
+  #         GroupSet: [!Ref applicationSecurityGroup]
+  #     UserData:
+  #       Fn::Base64: !Sub |
+  #         #!/bin/bash
+  #         sudo touch /tmp/webservice/.env
+  #         sudo chmod -R 777 /tmp/webservice/.env
+  #         sudo chown ec2-user:ec2-user /tmp/webservice/.env
+  #         sudo echo 'DB_HOSTNAME=${dbinstance.Endpoint.Address}' >> /tmp/webservice/.env
+  #         sudo echo 'DB_USER=${dbuserdetails}' >> /tmp/webservice/.env
+  #         sudo echo 'PASSWORD=${dbpassword}' >> /tmp/webservice/.env
+  #         sudo echo 'AWS_BUCKET_NAME=${S3Bucket}' >> /tmp/webservice/.env
+  #         sudo echo 'DB_NAME=${DatabaseName}' >> /tmp/webservice/.env
+  #         sudo echo 'AWS_ACCESS_KEY_ID=${accesskey}' >> /tmp/webservice/.env
+  #         sudo echo 'AWS_SECRET_ACCESS_KEY=${secretkey}' >> /tmp/webservice/.env
+  #         sudo echo 'AWS_BUCKET_REGION=${regionforbucket}' >> /tmp/webservice/.env
+  #         sudo echo 'NODE_ENV=demo' >> /tmp/webservice/.env
+  #         sleep 60
+  #         cd /tmp/webservice
+  #         sudo npm run db-migrate    
  
 
 # Generating output on Cloud Formation
