@@ -419,6 +419,27 @@ Resources:
               - "*"
             MaxAge: "3600"
 
+  # Allowing EC2 Instances(Launch Config) in the autoscaling group to get access to the latest code in the s3Bucket
+  CodeDeploy-EC2-S3-Policy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Description: Policy allowing EC2 instances in auto scaling to read data from S3 buckets
+    Properties:
+      ManagedPolicyName: CodeDeploy-EC2-S3-Policy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AllowGetPutDeleteActionsOnS3Bucket
+            Effect: Allow
+            Action:
+              - "s3:Get*" 
+              - "s3:List*"
+              - "s3:DeleteObject" 
+            Resource: 
+              - "arn:aws:s3:::webservice-code-deploy-bucket"
+              - "arn:aws:s3:::webservice-code-deploy-bucket/*"
+ 
+
+
   #creating s3 policy:
   s3policy:
     Type: "AWS::IAM::ManagedPolicy"
@@ -449,7 +470,7 @@ Resources:
   #creating IAM roles:
   s3role:
     Type: AWS::IAM::Role
-    DependsOn: s3policy
+    Description: The s3ROle is combining the s3 policy needed for code-deploy-bucket & image upload bucket
     Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -464,6 +485,7 @@ Resources:
       RoleName: EC2-CSYE6225
       ManagedPolicyArns:
         - !Ref s3policy
+        - !Ref CodeDeploy-EC2-S3-Policy
 
   #creating a instance profile:
   instanceEC2Profile:
@@ -594,9 +616,9 @@ Resources:
         - us-east-1c      
       Cooldown: '60'
       HealthCheckType: EC2
-      DesiredCapacity: '1'
+      DesiredCapacity: '2'
       LaunchConfigurationName: !Ref InstanceLaunchConfig
-      MinSize: '1'
+      MinSize: '2'
       MaxSize: '5'
       MetricsCollection:
         - Granularity: 1Minute
@@ -692,7 +714,7 @@ Resources:
         HostedZoneId: !GetAtt 
           - loadBalancer
           - CanonicalHostedZoneID
- 
+
           
 #EC2 Instance
   # ec2Instance:
