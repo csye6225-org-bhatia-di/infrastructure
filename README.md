@@ -15,7 +15,11 @@ aws cloudformation create-stack --stack-name webserviceStack7 --template-body fi
 
 Deleting stack
 aws s3 rm s3://52e7e710.dev.bhatiadi.me --recursive
-1.  
-2.  In order to delete a stack, run command 
-3.  aws cloudformation delete-stack --stack-name stackAdmin5
+
+Creating policies for Ci/Cd User (DEMO)
+aws cloudformation create-stack --stack-name cicdstack --template-body file://csye6225-cicd-policy-creation.yml --parameter ParameterKey=AwsAccountIdParameter,ParameterValue="105634846355" ParameterKey=CodeDeployApplicationNameParameter,ParameterValue="csye6225-webapp" --capabilities CAPABILITY_NAMED_IAM
+
+  
+1.  In order to delete a stack, run command 
+2.  aws cloudformation delete-stack --stack-name stackAdmin5
 
