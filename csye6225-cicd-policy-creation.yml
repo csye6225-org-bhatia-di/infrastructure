@@ -27,6 +27,10 @@ Resources:
             Effect: Allow
             Action:
               - "s3:PutObject"
+              - "s3:ListBucketMultipartUploads"
+              - "s3:ListBucketVersions"
+              - "s3:ListBucket"
+              - "s3:ListMultipartUploadParts"
             Resource: 
               - "arn:aws:s3:::webservice-code-deploy-bucket"
               - "arn:aws:s3:::webservice-code-deploy-bucket/*"
@@ -64,8 +68,14 @@ Resources:
               - "codedeploy:CreateDeployment"
               - "codedeploy:GetDeployment"
             Resource: 
-              - "arn:aws:s3:::webservice-code-deploy-bucket"
-              - "arn:aws:s3:::webservice-code-deploy-bucket/*"
+              - 'Fn::Join':
+                  - ''
+                  - - 'arn:aws:codedeploy:'
+                    - !Ref AwsRegionParameter
+                    - ':'
+                    - !Ref AwsAccountIdParameter
+                    - ':application:'
+                    - !Ref CodeDeployApplicationNameParameter
 
           - Sid: GetDeploymentConfigFromS3Bucket
             Effect: Allow
@@ -108,6 +118,8 @@ Resources:
           - Sid: AllowEC2Update
             Effect: Allow
             Action:
+              - "ec2:CreateTags"
+              - "ec2:DeleteTags"
               - "ec2:AttachVolume"
               - "ec2:AuthorizeSecurityGroupIngress"
               - "ec2:CopyImage"

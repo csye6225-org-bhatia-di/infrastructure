@@ -10,8 +10,8 @@ Steps:
 5. Run command to generate a stack using cloud formation :
 6. export AWS_PROFILE=demo
 aws ec2 import-key-pair --key-name "DevInstanceKey" --public-key-material fileb://DevInstanceKey.pem
-
-aws cloudformation create-stack --stack-name webserviceStack7 --template-body file://csye6225-infra.yml --parameter ParameterKey=MyImageParameter,ParameterValue="ami-0ca5a72d78678c959" ParameterKey=accesskey,ParameterValue="" ParameterKey=secretkey,ParameterValue="" ParameterKey=KeyPairParameter,ParameterValue="" ParameterKey=DomainNameParameter,ParameterValue="" --capabilities CAPABILITY_NAMED_IAM
+DEV
+aws cloudformation create-stack --stack-name webserviceStack5 --template-body file://csye6225-infra.yml --parameter ParameterKey=MyImageParameter,ParameterValue="ami-003aceb1e55fe8166" ParameterKey=KeyPairParameter,ParameterValue="DevInstancekey" ParameterKey=DomainNameParameter,ParameterValue="dev.bhatiadi.me" ParameterKey=hostedZoneID,ParameterValue="Z01096722S5OIW7NXF70F" --capabilities CAPABILITY_NAMED_IAM
 
 Deleting stack
 aws s3 rm s3://52e7e710.dev.bhatiadi.me --recursive

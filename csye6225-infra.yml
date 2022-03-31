@@ -40,7 +40,7 @@ Parameters:
     Type: String
     Description: Range for Subnet C
   MyImageParameter:
-    Default: ""
+    Default: "ami-003aceb1e55fe8166"
     Type: String
     Description: My Image Parameter  
   PrivateSubnet1CIDR:
@@ -55,14 +55,6 @@ Parameters:
     Default: "10.0.6.0/24"
     Type: String
     Description: Please Enter the IP Range for Private Subnet-3
-  secretkey:
-    Default: ""
-    Type: String
-    Description: AWS Secret key
-  accesskey:
-    Default: ""
-    Type: String
-    Description: AWS Access key    
   DatabaseInstanceIdentifier:
     AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
     ConstraintDescription: Must begin with a letter and contain only alphanumeric characters
@@ -124,13 +116,16 @@ Parameters:
     Description: Bucket region Access key
   hostedZoneID:
     Description: dev / demo zone id domain
+    Default: "Z01096722S5OIW7NXF70F"
     Type: String
   DomainNameParameter:
     Description: domain Name for S3 Bucket Naming
     Type: String
+    Default: "dev.bhatiadi.me"
   KeyPairParameter: 
     Description: Amazon EC2 Key Pair
     Type: "AWS::EC2::KeyPair::KeyName"
+    Default: "DevInstancekey"
     
 
 
@@ -420,7 +415,7 @@ Resources:
             MaxAge: "3600"
 
   # Allowing EC2 Instances(Launch Config) in the autoscaling group to get access to the latest code in the s3Bucket
-  CodeDeploy-EC2-S3-Policy:
+  CodeDeployEC2S3Policy:
     Type: "AWS::IAM::ManagedPolicy"
     Description: Policy allowing EC2 instances in auto scaling to read data from S3 buckets
     Properties:
@@ -428,13 +423,14 @@ Resources:
       PolicyDocument:
         Version: 2012-10-17
         Statement:
-          - Sid: AllowGetPutDeleteActionsOnS3Bucket_CodeDeploy
+          - Sid: AllowGetPutDeleteActionsOnS3BucketCodeDeploy
             Effect: Allow
             Action:
               - "s3:Get*" 
               - "s3:List*"
               - "s3:DeleteObject" 
             Resource: 
+              - "arn:aws:s3:::aws-codedeploy-us-east-1/*"
               - "arn:aws:s3:::webservice-code-deploy-bucket"
               - "arn:aws:s3:::webservice-code-deploy-bucket/*"
  
@@ -479,13 +475,14 @@ Resources:
             Principal:
               Service:
                 - ec2.amazonaws.com
+                - codedeploy.amazonaws.com
             Action:
               - "sts:AssumeRole"
       Path: /
       RoleName: EC2-CSYE6225
       ManagedPolicyArns:
         - !Ref s3policy
-        - !Ref CodeDeploy-EC2-S3-Policy
+        - !Ref CodeDeployEC2S3Policy
 
   #creating a instance profile:
   instanceEC2Profile:
@@ -596,8 +593,6 @@ Resources:
           sudo echo 'PASSWORD=${dbpassword}' >> /tmp/webservice/.env
           sudo echo 'AWS_BUCKET_NAME=${S3Bucket}' >> /tmp/webservice/.env
           sudo echo 'DB_NAME=${DatabaseName}' >> /tmp/webservice/.env
-          sudo echo 'AWS_ACCESS_KEY_ID=${accesskey}' >> /tmp/webservice/.env
-          sudo echo 'AWS_SECRET_ACCESS_KEY=${secretkey}' >> /tmp/webservice/.env
           sudo echo 'AWS_BUCKET_REGION=${regionforbucket}' >> /tmp/webservice/.env
           sudo echo 'NODE_ENV=demo' >> /tmp/webservice/.env
           sleep 60
@@ -714,6 +709,69 @@ Resources:
         HostedZoneId: !GetAtt 
           - loadBalancer
           - CanonicalHostedZoneID
+  # Code Deploy Setup
+  CsyeCodeDeploy:
+    Type: 'AWS::CodeDeploy::Application'  
+    Properties:
+      ApplicationName: 'csye6225-webapp'
+      ComputePlatform: 'Server'   
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-csye-code-dploy'
+
+  #Code Deploy Role
+  CodeDeployServiceRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Sid: CodeDeployServiceRole
+            Effect: Allow
+            Principal:
+              Service: codedeploy.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Path: /
+      RoleName: CodeDeployServiceRole
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-CodeDeployServiceRole"
+ 
+  
+
+
+  # Code Deployment Group Setup
+  CsyeCodeDeploymentGroup:
+    Type: 'AWS::CodeDeploy::DeploymentGroup'
+    Properties:
+      ServiceRoleArn: !GetAtt
+                    - CodeDeployServiceRole
+                    - Arn
+      ApplicationName: !Ref CsyeCodeDeploy
+      AutoRollbackConfiguration: 
+        Enabled: true
+        Events:
+          - "DEPLOYMENT_FAILURE" 
+      AutoScalingGroups: 
+        - !Ref autoScaleGrp
+      Ec2TagFilters:
+        - Type: KEY_AND_VALUE
+          Key: Application Role
+          Value: Web server          
+      DeploymentConfigName: CodeDeployDefault.AllAtOnce
+      DeploymentGroupName: 'csye6225-webapp-deployment'  
+      DeploymentStyle: 
+        DeploymentType: 'IN_PLACE'
+        DeploymentOption: 'WITHOUT_TRAFFIC_CONTROL'
+
+        
+
+
+
+
+
 
           
 #EC2 Instance
