@@ -86,9 +86,9 @@ Resources:
                     - ':'
                     - !Ref AwsAccountIdParameter
                     - ':deploymentgroup:'
-                    - !Ref CodeDeployGroupNameParameter
-                    - '/'
                     - !Ref CodeDeployApplicationNameParameter
+                    - '/'
+                    - !Ref CodeDeployGroupNameParameter
 
           - Sid: GetDeploymentConfigFromS3Bucket
             Effect: Allow
