@@ -1,0 +1,177 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: Attaching policy to a CI/CD gh-actions-app User
+Parameters:
+  AwsRegionParameter:
+    Default: "us-east-1"
+    Type: String
+    Description: Aws region in which stack is created
+  AwsAccountIdParameter:
+    Type: String
+    Description: Aws Account Id in which stack is created  
+  CodeDeployApplicationNameParameter:
+    Type: String
+    Description: The application name created in the code deploy setup
+  CodeDeployGroupNameParameter:
+    Type: String
+    Description: The application deployment group name created in the code deploy setup
+
+Resources:
+  # Allowing GithubActions to upload zip files to s3 bucket
+  GitActionsUploadToS3Policy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Description: Policy Allowing GithubActions to upload zip files to s3 bucket
+    Properties:
+      ManagedPolicyName: GitActions-Upload-To-S3-Policy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AllowGetPutDeleteActionsOnS3Bucket
+            Effect: Allow
+            Action:
+              - "s3:PutObject"
+              - "s3:ListBucketMultipartUploads"
+              - "s3:ListBucketVersions"
+              - "s3:ListBucket"
+              - "s3:ListMultipartUploadParts"
+            Resource: 
+              - "arn:aws:s3:::webservice-code-deploy-bucket"
+              - "arn:aws:s3:::webservice-code-deploy-bucket/*"
+      Users: [ ghactions-app ]          
+
+  # Allowing GithubActions to call code deploy API to deploy new code on EC2 instances
+  GitActionsCodeDeployToEC2Policy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Description: Allowing GithubActions to call code deploy API to deploy new code on EC2 instances
+    Properties:
+      ManagedPolicyName: GitActions-Code-Deploy-To-EC2-Policy
+      Users: [ ghactions-app ]
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AllowGetApplicationRevisionS3Bucket
+            Effect: Allow
+            Action:
+              - "codedeploy:RegisterApplicationRevision"
+              - "codedeploy:GetApplicationRevision"
+            Resource: 
+              - 'Fn::Join':
+                  - ''
+                  - - 'arn:aws:codedeploy:'
+                    - !Ref AwsRegionParameter
+                    - ':'
+                    - !Ref AwsAccountIdParameter
+                    - ':application:'
+                    - !Ref CodeDeployApplicationNameParameter
+
+
+          - Sid: AllowDeploymentActionsFromS3Bucket
+            Effect: Allow
+            Action:
+              - "codedeploy:CreateDeployment"
+              - "codedeploy:GetDeployment"
+            Resource: 
+              - 'Fn::Join':
+                  - ''
+                  - - 'arn:aws:codedeploy:'
+                    - !Ref AwsRegionParameter
+                    - ':'
+                    - !Ref AwsAccountIdParameter
+                    - ':application:'
+                    - !Ref CodeDeployApplicationNameParameter
+              - 'Fn::Join':
+                  - ''
+                  - - 'arn:aws:codedeploy:'
+                    - !Ref AwsRegionParameter
+                    - ':'
+                    - !Ref AwsAccountIdParameter
+                    - ':deploymentgroup:'
+                    - !Ref CodeDeployApplicationNameParameter
+                    - '/'
+                    - !Ref CodeDeployGroupNameParameter
+
+          - Sid: GetDeploymentConfigFromS3Bucket
+            Effect: Allow
+            Action:
+              - "codedeploy:GetDeploymentConfig"
+            Resource: 
+              - 'Fn::Join':
+                  - ''
+                  - - 'arn:aws:codedeploy:'
+                    - !Ref AwsRegionParameter
+                    - ':'
+                    - !Ref AwsAccountIdParameter
+                    - 'deploymentconfig:CodeDeployDefault.AllAtOnce'
+              - 'Fn::Join':
+                  - ''
+                  - - 'arn:aws:codedeploy:'
+                    - !Ref AwsRegionParameter
+                    - ':'
+                    - !Ref AwsAccountIdParameter
+                    - 'deploymentconfig:CodeDeployDefault.HalfAtATime'
+              - 'Fn::Join':
+                  - ''
+                  - - 'arn:aws:codedeploy:'
+                    - !Ref AwsRegionParameter
+                    - ':'
+                    - !Ref AwsAccountIdParameter
+                    - 'deploymentconfig:CodeDeployDefault.OneAtATime'
+
+
+  # Allowing GithubActions to change and update AMI from EC2 (ec2 was updated from the s3 bucket)
+  GitActionsEC2ToAMIPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Description: Allowing GithubActions to change and update AMI from EC2 (ec2 was updated from the s3 bucket)
+    Properties:
+      ManagedPolicyName: GitActions-EC2-To-AMI-Policy
+      Users: [ ghactions-app ]
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AllowEC2Update
+            Effect: Allow
+            Action:
+              - "ec2:CreateTags"
+              - "ec2:DeleteTags"
+              - "ec2:AttachVolume"
+              - "ec2:AuthorizeSecurityGroupIngress"
+              - "ec2:CopyImage"
+              - "ec2:CreateImage"
+              - "ec2:CreateKeypair"
+              - "ec2:CreateSecurityGroup"
+              - "ec2:CreateSnapshot"
+              - "ec2:CreateTags"
+              - "ec2:CreateVolume"
+              - "ec2:DeleteKeyPair"
+              - "ec2:DeleteSecurityGroup"
+              - "ec2:DeleteSnapshot"
+              - "ec2:DeleteVolume"
+              - "ec2:DeregisterImage"
+              - "ec2:DescribeImageAttribute"
+              - "ec2:DescribeImages"
+              - "ec2:DescribeInstances"
+              - "ec2:DescribeInstanceStatus"
+              - "ec2:DescribeRegions"
+              - "ec2:DescribeSecurityGroups"
+              - "ec2:DescribeSnapshots"
+              - "ec2:DescribeSubnets"
+              - "ec2:DescribeTags"
+              - "ec2:DescribeVolumes"
+              - "ec2:DetachVolume"
+              - "ec2:GetPasswordData"
+              - "ec2:ModifyImageAttribute"
+              - "ec2:ModifyInstanceAttribute"
+              - "ec2:ModifySnapshotAttribute"
+              - "ec2:RegisterImage"
+              - "ec2:RunInstances"
+              - "ec2:StopInstances"
+              - "ec2:TerminateInstances"
+            Resource: "*"    
+            
+
+
+              
+
+
+ 
+                
