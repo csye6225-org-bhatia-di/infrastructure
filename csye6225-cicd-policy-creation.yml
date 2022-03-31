@@ -12,6 +12,9 @@ Parameters:
   CodeDeployApplicationNameParameter:
     Type: String
     Description: The application name created in the code deploy setup
+  CodeDeployGroupNameParameter:
+    Type: String
+    Description: The application deployment group name created in the code deploy setup
 
 Resources:
   # Allowing GithubActions to upload zip files to s3 bucket
@@ -75,6 +78,16 @@ Resources:
                     - ':'
                     - !Ref AwsAccountIdParameter
                     - ':application:'
+                    - !Ref CodeDeployApplicationNameParameter
+              - 'Fn::Join':
+                  - ''
+                  - - 'arn:aws:codedeploy:'
+                    - !Ref AwsRegionParameter
+                    - ':'
+                    - !Ref AwsAccountIdParameter
+                    - ':deploymentgroup:'
+                    - !Ref CodeDeployGroupNameParameter
+                    - '/'
                     - !Ref CodeDeployApplicationNameParameter
 
           - Sid: GetDeploymentConfigFromS3Bucket

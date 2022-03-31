@@ -17,7 +17,7 @@ Deleting stack
 aws s3 rm s3://52e7e710.dev.bhatiadi.me --recursive
 
 Creating policies for Ci/Cd User (DEMO)
-aws cloudformation create-stack --stack-name cicdstack --template-body file://csye6225-cicd-policy-creation.yml --parameter ParameterKey=AwsAccountIdParameter,ParameterValue="105634846355" ParameterKey=CodeDeployApplicationNameParameter,ParameterValue="csye6225-webapp" --capabilities CAPABILITY_NAMED_IAM
+aws cloudformation create-stack --stack-name cicdstack --template-body file://csye6225-cicd-policy-creation.yml --parameter ParameterKey=AwsAccountIdParameter,ParameterValue="105634846355" ParameterKey=CodeDeployApplicationNameParameter,ParameterValue="csye6225-webapp" ParameterKey=CodeDeployGroupNameParameter,ParameterValue="csye6225-webapp-deployment"  --capabilities CAPABILITY_NAMED_IAM
 
   
 1.  In order to delete a stack, run command 
