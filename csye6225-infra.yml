@@ -464,6 +464,7 @@ Resources:
                       - Ref: S3Bucket
 
   #creating IAM roles:
+  # Updating the IAM role to get Cloud watch agent role as well
   s3role:
     Type: AWS::IAM::Role
     Description: The s3ROle is combining the s3 policy needed for code-deploy-bucket & image upload bucket
@@ -476,6 +477,8 @@ Resources:
               Service:
                 - ec2.amazonaws.com
                 - codedeploy.amazonaws.com
+                - streams.metrics.cloudwatch.amazonaws.com
+                - cloudwatch-crossaccount.amazonaws.com
             Action:
               - "sts:AssumeRole"
       Path: /
@@ -483,6 +486,7 @@ Resources:
       ManagedPolicyArns:
         - !Ref s3policy
         - !Ref CodeDeployEC2S3Policy
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy 
 
   #creating a instance profile:
   instanceEC2Profile:
