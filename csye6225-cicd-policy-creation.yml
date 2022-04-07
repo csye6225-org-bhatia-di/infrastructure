@@ -101,21 +101,21 @@ Resources:
                     - !Ref AwsRegionParameter
                     - ':'
                     - !Ref AwsAccountIdParameter
-                    - 'deploymentconfig:CodeDeployDefault.AllAtOnce'
+                    - ':deploymentconfig:CodeDeployDefault.AllAtOnce'
               - 'Fn::Join':
                   - ''
                   - - 'arn:aws:codedeploy:'
                     - !Ref AwsRegionParameter
                     - ':'
                     - !Ref AwsAccountIdParameter
-                    - 'deploymentconfig:CodeDeployDefault.HalfAtATime'
+                    - ':deploymentconfig:CodeDeployDefault.HalfAtATime'
               - 'Fn::Join':
                   - ''
                   - - 'arn:aws:codedeploy:'
                     - !Ref AwsRegionParameter
                     - ':'
                     - !Ref AwsAccountIdParameter
-                    - 'deploymentconfig:CodeDeployDefault.OneAtATime'
+                    - ':deploymentconfig:CodeDeployDefault.OneAtATime'
 
 
   # Allowing GithubActions to change and update AMI from EC2 (ec2 was updated from the s3 bucket)
