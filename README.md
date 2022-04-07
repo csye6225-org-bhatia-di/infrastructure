@@ -13,7 +13,7 @@ aws ec2 import-key-pair --key-name "DevInstanceKey" --public-key-material fileb:
 DEV
 aws cloudformation create-stack --stack-name webserviceStack5 --template-body file://csye6225-infra.yml --parameter ParameterKey=MyImageParameter,ParameterValue="ami-049a9b875d82152e2" ParameterKey=KeyPairParameter,ParameterValue="DevInstancekey" ParameterKey=DomainNameParameter,ParameterValue="dev.bhatiadi.me" ParameterKey=hostedZoneID,ParameterValue="Z01096722S5OIW7NXF70F" --capabilities CAPABILITY_NAMED_IAM
 DEMO
-aws cloudformation create-stack --stack-name webserviceStack5 --template-body file://csye6225-infra.yml --parameter ParameterKey=MyImageParameter,ParameterValue="ami-049a9b875d82152e2" ParameterKey=KeyPairParameter,ParameterValue="DemoKeyPair" ParameterKey=DomainNameParameter,ParameterValue="demo.bhatiadi.me" ParameterKey=hostedZoneID,ParameterValue="Z07744191EL8Q6DDK8QVQ" --capabilities CAPABILITY_NAMED_IAM
+aws cloudformation create-stack --stack-name webserviceStack5 --template-body file://csye6225-infra.yml --parameter ParameterKey=MyImageParameter,ParameterValue="ami-009b4d12bb4d7cbfc" ParameterKey=KeyPairParameter,ParameterValue="DemoKeyPair" ParameterKey=DomainNameParameter,ParameterValue="demo.bhatiadi.me" ParameterKey=hostedZoneID,ParameterValue="Z07744191EL8Q6DDK8QVQ" --capabilities CAPABILITY_NAMED_IAM
 
 Deleting stack
 aws s3 rm s3://52e7e710.dev.bhatiadi.me --recursive
