@@ -599,12 +599,11 @@ Resources:
           sudo echo 'DB_NAME=${DatabaseName}' >> /tmp/webservice/.env
           sudo echo 'AWS_BUCKET_REGION=${regionforbucket}' >> /tmp/webservice/.env
           sudo echo 'NODE_ENV=demo' >> /tmp/webservice/.env
-          sleep 30
-          sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/tmp/webservice/amazon-cloudwatch-agent.json -s
-          sleep 60
+          sleep 35
           cd /tmp/webservice
-          sudo npm run db-migrate  
-
+          sudo npm run db-migrate
+          sleep 10
+          
           
 # Auto scle grp
   autoScaleGrp:
