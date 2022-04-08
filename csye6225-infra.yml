@@ -599,7 +599,10 @@ Resources:
           sudo echo 'DB_NAME=${DatabaseName}' >> /tmp/webservice/.env
           sudo echo 'AWS_BUCKET_REGION=${regionforbucket}' >> /tmp/webservice/.env
           sudo echo 'NODE_ENV=demo' >> /tmp/webservice/.env
-          sleep 30
+          sleep 35
+          cd /tmp/webservice
+          sudo npm run db-migrate
+          sleep 10
           
           
 # Auto scle grp
