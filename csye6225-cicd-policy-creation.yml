@@ -180,7 +180,7 @@ Resources:
           - Action:
               - "lambda:UpdateFunctionCode"
             Effect: Allow
-            Resource: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:lambda_triggred_by_sns"
+            Resource: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:emailHandler"
       Users:
         - ghactions-app 
                 
