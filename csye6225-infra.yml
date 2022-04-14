@@ -109,7 +109,7 @@ Parameters:
   bucketnameforuse:
     Type: String
     Description: Name of the bucket
-    Default: dev.bhatiadi.me  
+    Default: demo.bhatiadi.me  
   regionforbucket:
     Default: "us-east-1"
     Type: String
@@ -121,7 +121,7 @@ Parameters:
   DomainNameParameter:
     Description: domain Name for S3 Bucket Naming
     Type: String
-    Default: "dev.bhatiadi.me"
+    Default: "demo.bhatiadi.me"
   KeyPairParameter: 
     Description: Amazon EC2 Key Pair
     Type: "AWS::EC2::KeyPair::KeyName"
@@ -462,12 +462,66 @@ Resources:
                     - ''
                     - - 'arn:aws:s3:::'
                       - Ref: S3Bucket
+  
+  AccountVerificationTableDynamoDbPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: AccountVerificationTableDynamoDbPolicy
+      Path: /
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:CreateTable
+              - dynamodb:DeleteItem
+              - dynamodb:UpdateItem
+              - dynamodb:UpdateTable
+              - dynamodb:PutItem
+              - dynamodb:DescribeStream
+              - dynamodb:List*
+              - dynamodb:DescribeTable
+              - dynamodb:GetItem
+              - dynamodb:Query
+              - dynamodb:Scan
+              - dynamodb:DescribeReservedCapacity*
+              - dynamodb:DescribeLimits
+              - dynamodb:DescribeTimeToLive
+            Resource:
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/AccountVerificationTable"
+  
+  emailTokenSNStopic:
+    Type: "AWS::SNS::Topic"
+    DependsOn: awsLambdaSESFunction
+    Properties:
+      Subscription:
+        - Endpoint: !GetAtt
+            - awsLambdaSESFunction
+            - Arn
+          Protocol: lambda
+      TopicName: emailTokenSNStopic
+
+  emailTokenSNStopicPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    DependsOn: emailTokenSNStopic
+    Properties:
+      ManagedPolicyName: emailTokenSNStopicPolicy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AllowEC2ToPublishToSNSTopic
+            Effect: Allow
+            Action:
+              - "sns:Publish"
+              - "sns:CreateTopic"
+            Resource: !Ref emailTokenSNStopic
+            
 
   #creating IAM roles:
   # Updating the IAM role to get Cloud watch agent role as well
-  s3role:
+  ec2RoleWithAccessToCodedeployS3LambdaCloudWatch:
     Type: AWS::IAM::Role
-    Description: The s3ROle is combining the s3 policy needed for code-deploy-bucket & image upload bucket
+    Description: The ec2RoleWithAccessToCodedeployS3LambdaCloudWatch is combining the s3 policy needed for code-deploy-bucket & image upload bucket
     Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -487,6 +541,8 @@ Resources:
         - !Ref s3policy
         - !Ref CodeDeployEC2S3Policy
         - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy 
+        - !Ref emailTokenSNStopicPolicy
+        - !Ref AccountVerificationTableDynamoDbPolicy
 
   #creating a instance profile:
   instanceEC2Profile:
@@ -495,7 +551,7 @@ Resources:
       InstanceProfileName: ec2-instance-profile
       Path: /
       Roles:
-        - !Ref s3role
+        - !Ref ec2RoleWithAccessToCodedeployS3LambdaCloudWatch
 
 
   loadbalSecGrp:
@@ -598,6 +654,8 @@ Resources:
           sudo echo 'AWS_BUCKET_NAME=${S3Bucket}' >> /tmp/webservice/.env
           sudo echo 'DB_NAME=${DatabaseName}' >> /tmp/webservice/.env
           sudo echo 'AWS_BUCKET_REGION=${regionforbucket}' >> /tmp/webservice/.env
+          sudo echo 'EMAIL_TOPIC_ARN=arn:aws:sns:${AWS::Region}:${AWS::AccountId}:email' >> /tmp/webservice/.env          
+          sudo echo 'DOMAIN_NAME=${DomainNameParameter}' >> /tmp/webservice/.env
           sudo echo 'NODE_ENV=demo' >> /tmp/webservice/.env
           sleep 35
           cd /tmp/webservice
@@ -771,9 +829,132 @@ Resources:
         DeploymentType: 'IN_PLACE'
         DeploymentOption: 'WITHOUT_TRAFFIC_CONTROL'
 
-        
+  AccountVerificationTableId:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      TableName: AccountVerificationTable
+      AttributeDefinitions:
+        - AttributeName: accountVerificationID
+          AttributeType: S
+        - AttributeName: expireUnix
+          AttributeType: N          
+      KeySchema:
+        - AttributeName: accountVerificationID
+          KeyType: HASH
+        - AttributeName: expireUnix
+          KeyType: RANGE  
+      ProvisionedThroughput:
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
+      TimeToLiveSpecification:
+        AttributeName: expireUnix
+        Enabled: true
+
+  #creating dynamoDB:
+  SentEmailTable:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      TableName: SentEmailTable
+      AttributeDefinitions:
+        - AttributeName: existingEmailId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: existingEmailId
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
+      
+  lambdaPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    DependsOn: emailTokenSNStopic
+    Properties:
+      ManagedPolicyName: lambdaPolicy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: LambdaDynamoDBAccess
+            Effect: Allow
+            Action:
+              - "dynamodb:GetItem"
+              - "dynamodb:PutItem"
+              - "dynamodb:UpdateItem"
+              - "dynamodb:Scan"
+            Resource:
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/ExistingEmailTable"
+          - Sid: LambdaSESAccess
+            Effect: Allow
+            Action:
+              - "ses:VerifyEmailAddress"
+              - "ses:SendEmail"
+              - "ses:SendRawEmail"
+            Resource: !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/*"
+          - Sid: LambdaS3Access
+            Effect: Allow
+            Action:
+              - "s3:GetObject"
+            Resource: !Sub "arn:aws:s3:::serverless.${DomainNameParameter}/*"
+          - Sid: LambdaSNSAccess
+            Effect: Allow
+            Action:
+              - "sns:ConfirmSubscription"
+            Resource: !Ref emailTokenSNStopic
+      Roles:
+        - !Ref lambdaExecutionRole
+
+  #creating role for Lambda:
+  lambdaExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: "sts:AssumeRole"
+      Path: /
+      RoleName: LambdaExecutionRole
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-LambdaExecutionRoleId"
 
 
+  awsLambdaSESFunction:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      FunctionName: emailHandler
+      Code:
+        S3Bucket: serverless-code-deploy-bucket
+        S3Key: csye6225lambda.zip
+      Handler: index.handler
+      Environment:
+        Variables:
+          domain: !Ref DomainNameParameter
+          table: !Ref SentEmailTable
+      Role: !GetAtt
+        - lambdaExecutionRole
+        - Arn
+      Runtime: nodejs14.x
+      MemorySize: 256
+      Timeout: 180
+      ReservedConcurrentExecutions: 5
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-Email"
+        - Key: Application Role
+          Value: Email Lambda
+
+  #creating permission for lambda:
+  lambdaPermission:
+    Type: "AWS::Lambda::Permission"
+    DependsOn: awsLambdaSESFunction
+    Properties:
+      FunctionName: !Ref awsLambdaSESFunction
+      Action: "lambda:InvokeFunction"
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref emailTokenSNStopic
 
 
 
