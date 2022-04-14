@@ -22,7 +22,7 @@ Creating policies for Ci/Cd User (DEV)
 aws cloudformation create-stack --stack-name cicdstack --template-body file://csye6225-cicd-policy-creation.yml --parameter ParameterKey=AwsAccountIdParameter,ParameterValue="105634846355" ParameterKey=CodeDeployApplicationNameParameter,ParameterValue="csye6225-webapp" ParameterKey=CodeDeployGroupNameParameter,ParameterValue="csye6225-webapp-deployment"  --capabilities CAPABILITY_NAMED_IAM
 
 Creating policies for Ci/Cd User (DEMO)
-aws cloudformation create-stack --stack-name cicdstack --template-body file://csye6225-cicd-policy-creation.yml --parameter ParameterKey=AwsAccountIdParameter,ParameterValue="406472615172" ParameterKey=CodeDeployApplicationNameParameter,ParameterValue="csye6225-webapp" ParameterKey=CodeDeployGroupNameParameter,ParameterValue="csye6225-webapp-deployment"  --capabilities CAPABILITY_NAMED_IAM
+aws cloudformation create-stack --stack-name cicdstack --template-body file://csye6225-cicd-policy-creation.yml  --parameter ParameterKey=AwsAccountIdParameter,ParameterValue="406472615172" ParameterKey=CodeDeployApplicationNameParameter,ParameterValue="csye6225-webapp" ParameterKey=CodeDeployGroupNameParameter,ParameterValue="csye6225-webapp-deployment"  --capabilities CAPABILITY_NAMED_IAM
 
   
 1.  In order to delete a stack, run command 

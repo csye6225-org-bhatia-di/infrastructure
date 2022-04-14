@@ -20,7 +20,7 @@ Resources:
   # Allowing GithubActions to upload zip files to s3 bucket
   GitActionsUploadToS3Policy:
     Type: "AWS::IAM::ManagedPolicy"
-    Description: Policy Allowing GithubActions to upload zip files to s3 bucket
+    Description: Policy Allowing GithubActions to upload zip files to s3 bucket for both webservice app and servrless app
     Properties:
       ManagedPolicyName: GitActions-Upload-To-S3-Policy
       PolicyDocument:
@@ -37,6 +37,8 @@ Resources:
             Resource: 
               - "arn:aws:s3:::webservice-code-deploy-bucket"
               - "arn:aws:s3:::webservice-code-deploy-bucket/*"
+              - "arn:aws:s3:::serverless-code-deploy-bucket"
+              - "arn:aws:s3:::serverless-code-deploy-bucket/*"
       Users: [ ghactions-app ]          
 
   # Allowing GithubActions to call code deploy API to deploy new code on EC2 instances
@@ -167,11 +169,18 @@ Resources:
               - "ec2:StopInstances"
               - "ec2:TerminateInstances"
             Resource: "*"    
-            
 
-
-              
-
-
- 
+  AwsLambdaFunctionPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: AwsLambdaUpdateFunction
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - "lambda:UpdateFunctionCode"
+            Effect: Allow
+            Resource: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:lambda_triggred_by_sns"
+      Users:
+        - ghactions-app 
                 

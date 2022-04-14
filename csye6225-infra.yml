@@ -109,7 +109,7 @@ Parameters:
   bucketnameforuse:
     Type: String
     Description: Name of the bucket
-    Default: dev.bhatiadi.me  
+    Default: demo.bhatiadi.me  
   regionforbucket:
     Default: "us-east-1"
     Type: String
@@ -121,7 +121,7 @@ Parameters:
   DomainNameParameter:
     Description: domain Name for S3 Bucket Naming
     Type: String
-    Default: "dev.bhatiadi.me"
+    Default: "demo.bhatiadi.me"
   KeyPairParameter: 
     Description: Amazon EC2 Key Pair
     Type: "AWS::EC2::KeyPair::KeyName"
@@ -598,6 +598,8 @@ Resources:
           sudo echo 'AWS_BUCKET_NAME=${S3Bucket}' >> /tmp/webservice/.env
           sudo echo 'DB_NAME=${DatabaseName}' >> /tmp/webservice/.env
           sudo echo 'AWS_BUCKET_REGION=${regionforbucket}' >> /tmp/webservice/.env
+          sudo echo 'EMAIL_TOPIC_ARN=arn:aws:sns:${AWS::Region}:${AWS::AccountId}:email' >> /tmp/webservice/.env          
+          sudo echo 'DOMAIN_NAME=${DomainNameParameter}' >> /tmp/webservice/.env
           sudo echo 'NODE_ENV=demo' >> /tmp/webservice/.env
           sleep 35
           cd /tmp/webservice
