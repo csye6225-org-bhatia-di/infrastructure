@@ -881,7 +881,7 @@ Resources:
               - "dynamodb:UpdateItem"
               - "dynamodb:Scan"
             Resource:
-              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/ExistingEmailTable"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/SentEmailTable"
           - Sid: LambdaSESAccess
             Effect: Allow
             Action:
