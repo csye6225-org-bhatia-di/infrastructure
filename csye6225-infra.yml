@@ -348,6 +348,25 @@ Resources:
       Tags:
         - Key: Name
           Value: database subnets
+  kmsKeyRDSInstance:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: An example symmetric KMS key
+      PendingWindowInDays: 10
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: key-rds
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Join
+                - ""
+                - - "arn:aws:iam::"
+                  - !Ref "AWS::AccountId"
+                  - ":root"
+            Action: "kms:*"
+            Resource: "*"
 
   dbinstance:
     Type: AWS::RDS::DBInstance
@@ -360,7 +379,8 @@ Resources:
       DBName: !Ref DatabaseName
       DBSubnetGroupName: !Ref dbsubgrp
       Engine: postgres
-      EngineVersion: 12.9
+      EngineVersion: 13.4
+      KmsKeyId: !Ref kmsKeyRDSInstance
       MasterUsername: !Ref dbuserdetails
       MasterUserPassword: !Ref dbpassword
       MultiAZ: !Ref dbmultiaz
@@ -625,19 +645,94 @@ Resources:
 
   # Routing SSL certificate
   ssllistener:
-  Type: 'AWS::ElasticLoadBalancingV2::Listener'
-  Properties:
-    DefaultActions:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref loadBalTG 
-    LoadBalancerArn: !Ref loadBalancer
-    Port: '443'
-    Protocol: HTTPS
-    Certificates:
-      - CertificateArn: >-
-          arn:aws:acm:${AWS::Region}:${AWS::AccountId}:certificate/*    
+      LoadBalancerArn: !Ref loadBalancer
+      Port: '443'
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: >-
+            arn:aws:acm:${AWS::Region}:${AWS::AccountId}:certificate/* 
 
+# Encrypting ebs volumes of ec2 instance
+  ec2EBSKey:
+    Type: 'AWS::KMS::Key'
+    Properties:
+      Description: ec2 ebs key
+      MultiRegion: true
+      EnableKeyRotation: true
+      PendingWindowInDays: 10
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: key-default-1
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: 
+                - 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: 'kms:*'
+            Resource: '*'
+          - Sid: Allow administration of the key
+            Effect: Allow
+            Principal:
+              AWS:
+                - 'arn:aws:iam::${AWS::AccountId}:user/*'
+                - 'arn:aws:iam::${AWS::AccountId}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling'
+            Action:
+            - 'kms:ReplicateKey'
+            - 'kms:Create*'
+            - 'kms:Describe*'
+            - 'kms:Enable*'
+            - 'kms:List*'
+            - 'kms:Put*'
+            - 'kms:Update*'
+            - 'kms:Revoke*'
+            - 'kms:Disable*'
+            - 'kms:Get*'
+            - 'kms:Delete*'
+            - 'kms:ScheduleKeyDeletion'
+            - 'kms:CancelKeyDeletion'
+            Resource: '*'
 
+          - Sid: "Allow use of the key by AutoScaling, ghaction and admin"
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Sub >-
+                  arn:aws:iam::${AWS::AccountId}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling
+            Action:
+              - "kms:Encrypt"
+              - "kms:Decrypt"
+              - "kms:ReEncrypt*"
+              - "kms:GenerateDataKey*"
+              - "kms:DescribeKey"
+            Resource: "*"
+
+          - Sid: "Allow attachment of persistent resources by AutoScaling"
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Sub >-
+                  arn:aws:iam::${AWS::AccountId}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling
+            Action:
+              - "kms:CreateGrant"
+              - "kms:ListGrants"
+              - "kms:RevokeGrant"
+            Resource: "*"
+            Condition:
+              Bool:
+                "kms:GrantIsForAWSResource": "true"  
+  ec2EBSKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/ec2EBSKey
+      TargetKeyId: !Ref ec2EBSKey
+              
+          
 # instance config for every launch
   InstanceLaunchConfig:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
@@ -657,6 +752,8 @@ Resources:
             VolumeType: gp2
             DeleteOnTermination: true
             VolumeSize: '20'
+            KmsKeyId: !Ref ec2EBSKey
+            Encrypted: true
       EbsOptimized: false
       UserData:
         Fn::Base64: !Sub |
