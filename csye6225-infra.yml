@@ -97,8 +97,8 @@ Parameters:
     Type: Number
   dbinstancedetails:
     AllowedValues:
-      - db.t2.micro
-    Default: db.t2.micro
+      - db.t3.micro
+    Default: db.t3.micro
     Type: String
   dbmultiaz:
     AllowedValues:
@@ -299,12 +299,12 @@ Resources:
   rdsprameterGroup:
     Type: AWS::RDS::DBParameterGroup
     Properties:
-      Family: postgres12
+      Family: postgres13
       Description: Custom Database Parameter Group
       Parameters:
         shared_preload_libraries: "pg_stat_statements"
-
-
+        log_statement: "all"
+        rds.force_ssl: 1
 
   #EC2 Security Group
   applicationSecurityGroup:
@@ -673,15 +673,15 @@ Resources:
             Effect: Allow
             Principal:
               AWS: 
-                - 'arn:aws:iam::${AWS::AccountId}:root'
+                - !Sub "arn:aws:iam::${AWS::AccountId}:root"
             Action: 'kms:*'
             Resource: '*'
           - Sid: Allow administration of the key
             Effect: Allow
             Principal:
               AWS:
-                - 'arn:aws:iam::${AWS::AccountId}:user/*'
-                - 'arn:aws:iam::${AWS::AccountId}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling'
+                - !Sub >-
+                  arn:aws:iam::${AWS::AccountId}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling
             Action:
             - 'kms:ReplicateKey'
             - 'kms:Create*'
@@ -739,7 +739,7 @@ Resources:
     Properties:
       LaunchConfigurationName: asg_launch_config
       PlacementTenancy: default
-      InstanceType: t2.micro
+      InstanceType: t3.micro
       AssociatePublicIpAddress: true
       IamInstanceProfile: !Ref instanceEC2Profile
       ImageId: !Ref MyImageParameter
