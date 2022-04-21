@@ -366,6 +366,7 @@ Resources:
       MultiAZ: !Ref dbmultiaz
       PubliclyAccessible: false
       DBParameterGroupName: !Ref rdsprameterGroup
+      StorageEncrypted: true
       VPCSecurityGroups:
         - !Ref dbsecuritygrp
 
@@ -569,7 +570,8 @@ Resources:
           FromPort: '80'
           ToPort: '80'
           CidrIp: 0.0.0.0/0
-        
+
+  
   loadBalancer:
     Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
     Properties:
@@ -611,15 +613,29 @@ Resources:
       VpcId: !Ref VirtualPrivateCloudVPC
 
 # Routing 80 to the right port      
-  loadBalancerListener:
-    Type: 'AWS::ElasticLoadBalancingV2::Listener'
-    Properties:
-      DefaultActions:
+  # loadBalancerListener:
+  #   Type: 'AWS::ElasticLoadBalancingV2::Listener'
+  #   Properties:
+  #     DefaultActions:
+  #       - Type: forward
+  #         TargetGroupArn: !Ref loadBalTG
+  #     LoadBalancerArn: !Ref loadBalancer
+  #     Port: 80
+  #     Protocol: HTTP  
+
+  # Routing SSL certificate
+  ssllistener:
+  Type: 'AWS::ElasticLoadBalancingV2::Listener'
+  Properties:
+    DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref loadBalTG
-      LoadBalancerArn: !Ref loadBalancer
-      Port: 80
-      Protocol: HTTP  
+          TargetGroupArn: !Ref loadBalTG 
+    LoadBalancerArn: !Ref loadBalancer
+    Port: '443'
+    Protocol: HTTPS
+    Certificates:
+      - CertificateArn: >-
+          arn:aws:acm:${AWS::Region}:${AWS::AccountId}:certificate/*    
 
 
 # instance config for every launch
