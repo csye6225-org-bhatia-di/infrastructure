@@ -655,7 +655,7 @@ Resources:
       Protocol: HTTPS
       Certificates:
         - CertificateArn: >-
-            arn:aws:acm:${AWS::Region}:${AWS::AccountId}:certificate/* 
+            arn:aws:acm:${AWS::Region}:${AWS::AccountId}:certificate/3db8972a-67ff-4b6c-a13a-52f54b2dd6b6
 
 # Encrypting ebs volumes of ec2 instance
   ec2EBSKey:
