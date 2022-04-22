@@ -655,7 +655,7 @@ Resources:
       Protocol: HTTPS
       Certificates:
         - CertificateArn: >-
-            arn:aws:acm:${AWS::Region}:${AWS::AccountId}:certificate/3db8972a-67ff-4b6c-a13a-52f54b2dd6b6
+            arn:aws:acm:us-east-1:406472615172:certificate/3db8972a-67ff-4b6c-a13a-52f54b2dd6b6
 
 # Encrypting ebs volumes of ec2 instance
   ec2EBSKey:
@@ -735,45 +735,52 @@ Resources:
           
 # instance config for every launch
   InstanceLaunchConfig:
-    Type: 'AWS::AutoScaling::LaunchConfiguration'
+    Type: 'AWS::EC2::LaunchTemplate'
     Properties:
-      LaunchConfigurationName: asg_launch_config
-      PlacementTenancy: default
-      InstanceType: t3.micro
-      AssociatePublicIpAddress: true
-      IamInstanceProfile: !Ref instanceEC2Profile
-      ImageId: !Ref MyImageParameter
-      SecurityGroups:
-        - !Ref applicationSecurityGroup
-      KeyName: !Ref KeyPairParameter
-      BlockDeviceMappings:
-        - DeviceName: /dev/xvda
-          Ebs:
-            VolumeType: gp2
+      LaunchTemplateName: asg_launch_config
+      LaunchTemplateData:
+        NetworkInterfaces:
+          - DeviceIndex: 0
+            AssociatePublicIpAddress: true
+            Groups:
+              - !Ref applicationSecurityGroup
             DeleteOnTermination: true
-            VolumeSize: '20'
-            KmsKeyId: !Ref ec2EBSKey
-            Encrypted: true
-      EbsOptimized: false
-      UserData:
-        Fn::Base64: !Sub |
-          #!/bin/bash
-          sudo touch /tmp/webservice/.env
-          sudo chmod -R 777 /tmp/webservice/.env
-          sudo chown ec2-user:ec2-user /tmp/webservice/.env
-          sudo echo 'DB_HOSTNAME=${dbinstance.Endpoint.Address}' >> /tmp/webservice/.env
-          sudo echo 'DB_USER=${dbuserdetails}' >> /tmp/webservice/.env
-          sudo echo 'PASSWORD=${dbpassword}' >> /tmp/webservice/.env
-          sudo echo 'AWS_BUCKET_NAME=${S3Bucket}' >> /tmp/webservice/.env
-          sudo echo 'DB_NAME=${DatabaseName}' >> /tmp/webservice/.env
-          sudo echo 'AWS_BUCKET_REGION=${regionforbucket}' >> /tmp/webservice/.env
-          sudo echo 'EMAIL_TOPIC_ARN=arn:aws:sns:${AWS::Region}:${AWS::AccountId}:emailTokenSNStopic' >> /tmp/webservice/.env          
-          sudo echo 'DOMAIN_NAME=${DomainNameParameter}' >> /tmp/webservice/.env
-          sudo echo 'NODE_ENV=demo' >> /tmp/webservice/.env
-          sleep 35
-          cd /tmp/webservice
-          sudo npm run db-migrate
-          sleep 10
+        Placement:
+          Tenancy: default
+        IamInstanceProfile:
+          Arn: !GetAtt
+            - instanceEC2Profile
+            - Arn
+        InstanceType: t3.micro
+        ImageId: !Ref MyImageParameter
+        KeyName: !Ref KeyPairParameter
+        BlockDeviceMappings:
+          - Ebs:
+              VolumeSize: 20
+              VolumeType: gp2
+              DeleteOnTermination: true
+              Encrypted: true
+              KmsKeyId: !Ref ec2EBSKey
+            DeviceName: /dev/xvda      
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            sudo touch /tmp/webservice/.env
+            sudo chmod -R 777 /tmp/webservice/.env
+            sudo chown ec2-user:ec2-user /tmp/webservice/.env
+            sudo echo 'DB_HOSTNAME=${dbinstance.Endpoint.Address}' >> /tmp/webservice/.env
+            sudo echo 'DB_USER=${dbuserdetails}' >> /tmp/webservice/.env
+            sudo echo 'PASSWORD=${dbpassword}' >> /tmp/webservice/.env
+            sudo echo 'AWS_BUCKET_NAME=${S3Bucket}' >> /tmp/webservice/.env
+            sudo echo 'DB_NAME=${DatabaseName}' >> /tmp/webservice/.env
+            sudo echo 'AWS_BUCKET_REGION=${regionforbucket}' >> /tmp/webservice/.env
+            sudo echo 'EMAIL_TOPIC_ARN=arn:aws:sns:${AWS::Region}:${AWS::AccountId}:emailTokenSNStopic' >> /tmp/webservice/.env          
+            sudo echo 'DOMAIN_NAME=${DomainNameParameter}' >> /tmp/webservice/.env
+            sudo echo 'NODE_ENV=demo' >> /tmp/webservice/.env
+            sleep 35
+            cd /tmp/webservice
+            sudo npm run db-migrate
+            sleep 10
           
           
 # Auto scle grp
@@ -788,7 +795,9 @@ Resources:
       Cooldown: '60'
       HealthCheckType: EC2
       DesiredCapacity: '2'
-      LaunchConfigurationName: !Ref InstanceLaunchConfig
+      LaunchTemplate:
+        LaunchTemplateId: !Ref InstanceLaunchConfig
+        Version: !GetAtt InstanceLaunchConfig.LatestVersionNumber
       MinSize: '2'
       MaxSize: '5'
       MetricsCollection:
