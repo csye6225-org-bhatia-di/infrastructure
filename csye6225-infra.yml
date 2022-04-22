@@ -97,8 +97,8 @@ Parameters:
     Type: Number
   dbinstancedetails:
     AllowedValues:
-      - db.t2.micro
-    Default: db.t2.micro
+      - db.t3.micro
+    Default: db.t3.micro
     Type: String
   dbmultiaz:
     AllowedValues:
@@ -299,12 +299,12 @@ Resources:
   rdsprameterGroup:
     Type: AWS::RDS::DBParameterGroup
     Properties:
-      Family: postgres12
+      Family: postgres13
       Description: Custom Database Parameter Group
       Parameters:
         shared_preload_libraries: "pg_stat_statements"
-
-
+        log_statement: "all"
+        rds.force_ssl: 1
 
   #EC2 Security Group
   applicationSecurityGroup:
@@ -348,6 +348,25 @@ Resources:
       Tags:
         - Key: Name
           Value: database subnets
+  kmsKeyRDSInstance:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: An example symmetric KMS key
+      PendingWindowInDays: 10
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: key-rds
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Join
+                - ""
+                - - "arn:aws:iam::"
+                  - !Ref "AWS::AccountId"
+                  - ":root"
+            Action: "kms:*"
+            Resource: "*"
 
   dbinstance:
     Type: AWS::RDS::DBInstance
@@ -360,12 +379,14 @@ Resources:
       DBName: !Ref DatabaseName
       DBSubnetGroupName: !Ref dbsubgrp
       Engine: postgres
-      EngineVersion: 12.9
+      EngineVersion: 13.4
+      KmsKeyId: !Ref kmsKeyRDSInstance
       MasterUsername: !Ref dbuserdetails
       MasterUserPassword: !Ref dbpassword
       MultiAZ: !Ref dbmultiaz
       PubliclyAccessible: false
       DBParameterGroupName: !Ref rdsprameterGroup
+      StorageEncrypted: true
       VPCSecurityGroups:
         - !Ref dbsecuritygrp
 
@@ -569,7 +590,8 @@ Resources:
           FromPort: '80'
           ToPort: '80'
           CidrIp: 0.0.0.0/0
-        
+
+  
   loadBalancer:
     Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
     Properties:
@@ -611,56 +633,154 @@ Resources:
       VpcId: !Ref VirtualPrivateCloudVPC
 
 # Routing 80 to the right port      
-  loadBalancerListener:
+  # loadBalancerListener:
+  #   Type: 'AWS::ElasticLoadBalancingV2::Listener'
+  #   Properties:
+  #     DefaultActions:
+  #       - Type: forward
+  #         TargetGroupArn: !Ref loadBalTG
+  #     LoadBalancerArn: !Ref loadBalancer
+  #     Port: 80
+  #     Protocol: HTTP  
+
+  # Routing SSL certificate
+  ssllistener:
     Type: 'AWS::ElasticLoadBalancingV2::Listener'
     Properties:
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref loadBalTG
+          TargetGroupArn: !Ref loadBalTG 
       LoadBalancerArn: !Ref loadBalancer
-      Port: 80
-      Protocol: HTTP  
+      Port: '443'
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: >-
+            arn:aws:acm:us-east-1:406472615172:certificate/3db8972a-67ff-4b6c-a13a-52f54b2dd6b6
 
+# Encrypting ebs volumes of ec2 instance
+  ec2EBSKey:
+    Type: 'AWS::KMS::Key'
+    Properties:
+      Description: ec2 ebs key
+      MultiRegion: true
+      EnableKeyRotation: true
+      PendingWindowInDays: 10
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: key-default-1
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: 
+                - !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: 'kms:*'
+            Resource: '*'
+          - Sid: Allow administration of the key
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Sub >-
+                  arn:aws:iam::${AWS::AccountId}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling
+            Action:
+            - 'kms:ReplicateKey'
+            - 'kms:Create*'
+            - 'kms:Describe*'
+            - 'kms:Enable*'
+            - 'kms:List*'
+            - 'kms:Put*'
+            - 'kms:Update*'
+            - 'kms:Revoke*'
+            - 'kms:Disable*'
+            - 'kms:Get*'
+            - 'kms:Delete*'
+            - 'kms:ScheduleKeyDeletion'
+            - 'kms:CancelKeyDeletion'
+            Resource: '*'
 
+          - Sid: "Allow use of the key by AutoScaling, ghaction and admin"
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Sub >-
+                  arn:aws:iam::${AWS::AccountId}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling
+            Action:
+              - "kms:Encrypt"
+              - "kms:Decrypt"
+              - "kms:ReEncrypt*"
+              - "kms:GenerateDataKey*"
+              - "kms:DescribeKey"
+            Resource: "*"
+
+          - Sid: "Allow attachment of persistent resources by AutoScaling"
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Sub >-
+                  arn:aws:iam::${AWS::AccountId}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling
+            Action:
+              - "kms:CreateGrant"
+              - "kms:ListGrants"
+              - "kms:RevokeGrant"
+            Resource: "*"
+            Condition:
+              Bool:
+                "kms:GrantIsForAWSResource": "true"  
+  ec2EBSKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/ec2EBSKey
+      TargetKeyId: !Ref ec2EBSKey
+              
+          
 # instance config for every launch
   InstanceLaunchConfig:
-    Type: 'AWS::AutoScaling::LaunchConfiguration'
+    Type: 'AWS::EC2::LaunchTemplate'
     Properties:
-      LaunchConfigurationName: asg_launch_config
-      PlacementTenancy: default
-      InstanceType: t2.micro
-      AssociatePublicIpAddress: true
-      IamInstanceProfile: !Ref instanceEC2Profile
-      ImageId: !Ref MyImageParameter
-      SecurityGroups:
-        - !Ref applicationSecurityGroup
-      KeyName: !Ref KeyPairParameter
-      BlockDeviceMappings:
-        - DeviceName: /dev/xvda
-          Ebs:
-            VolumeType: gp2
+      LaunchTemplateName: asg_launch_config
+      LaunchTemplateData:
+        NetworkInterfaces:
+          - DeviceIndex: 0
+            AssociatePublicIpAddress: true
+            Groups:
+              - !Ref applicationSecurityGroup
             DeleteOnTermination: true
-            VolumeSize: '20'
-      EbsOptimized: false
-      UserData:
-        Fn::Base64: !Sub |
-          #!/bin/bash
-          sudo touch /tmp/webservice/.env
-          sudo chmod -R 777 /tmp/webservice/.env
-          sudo chown ec2-user:ec2-user /tmp/webservice/.env
-          sudo echo 'DB_HOSTNAME=${dbinstance.Endpoint.Address}' >> /tmp/webservice/.env
-          sudo echo 'DB_USER=${dbuserdetails}' >> /tmp/webservice/.env
-          sudo echo 'PASSWORD=${dbpassword}' >> /tmp/webservice/.env
-          sudo echo 'AWS_BUCKET_NAME=${S3Bucket}' >> /tmp/webservice/.env
-          sudo echo 'DB_NAME=${DatabaseName}' >> /tmp/webservice/.env
-          sudo echo 'AWS_BUCKET_REGION=${regionforbucket}' >> /tmp/webservice/.env
-          sudo echo 'EMAIL_TOPIC_ARN=arn:aws:sns:${AWS::Region}:${AWS::AccountId}:emailTokenSNStopic' >> /tmp/webservice/.env          
-          sudo echo 'DOMAIN_NAME=${DomainNameParameter}' >> /tmp/webservice/.env
-          sudo echo 'NODE_ENV=demo' >> /tmp/webservice/.env
-          sleep 35
-          cd /tmp/webservice
-          sudo npm run db-migrate
-          sleep 10
+        Placement:
+          Tenancy: default
+        IamInstanceProfile:
+          Arn: !GetAtt
+            - instanceEC2Profile
+            - Arn
+        InstanceType: t3.micro
+        ImageId: !Ref MyImageParameter
+        KeyName: !Ref KeyPairParameter
+        BlockDeviceMappings:
+          - Ebs:
+              VolumeSize: 20
+              VolumeType: gp2
+              DeleteOnTermination: true
+              Encrypted: true
+              KmsKeyId: !Ref ec2EBSKey
+            DeviceName: /dev/xvda      
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            sudo touch /tmp/webservice/.env
+            sudo chmod -R 777 /tmp/webservice/.env
+            sudo chown ec2-user:ec2-user /tmp/webservice/.env
+            sudo echo 'DB_HOSTNAME=${dbinstance.Endpoint.Address}' >> /tmp/webservice/.env
+            sudo echo 'DB_USER=${dbuserdetails}' >> /tmp/webservice/.env
+            sudo echo 'PASSWORD=${dbpassword}' >> /tmp/webservice/.env
+            sudo echo 'AWS_BUCKET_NAME=${S3Bucket}' >> /tmp/webservice/.env
+            sudo echo 'DB_NAME=${DatabaseName}' >> /tmp/webservice/.env
+            sudo echo 'AWS_BUCKET_REGION=${regionforbucket}' >> /tmp/webservice/.env
+            sudo echo 'EMAIL_TOPIC_ARN=arn:aws:sns:${AWS::Region}:${AWS::AccountId}:emailTokenSNStopic' >> /tmp/webservice/.env          
+            sudo echo 'DOMAIN_NAME=${DomainNameParameter}' >> /tmp/webservice/.env
+            sudo echo 'NODE_ENV=demo' >> /tmp/webservice/.env
+            sleep 35
+            cd /tmp/webservice
+            sudo npm run db-migrate
+            sleep 10
           
           
 # Auto scle grp
@@ -675,7 +795,9 @@ Resources:
       Cooldown: '60'
       HealthCheckType: EC2
       DesiredCapacity: '2'
-      LaunchConfigurationName: !Ref InstanceLaunchConfig
+      LaunchTemplate:
+        LaunchTemplateId: !Ref InstanceLaunchConfig
+        Version: !GetAtt InstanceLaunchConfig.LatestVersionNumber
       MinSize: '2'
       MaxSize: '5'
       MetricsCollection:
